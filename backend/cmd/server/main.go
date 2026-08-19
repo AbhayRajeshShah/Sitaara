@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/auth"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/config"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
@@ -37,12 +38,15 @@ func main() {
 	}
 
 	queries := sqlc.New(pool)
-	usersHandler := users.NewHandler(users.NewService(pool, queries))
+	issuer := auth.NewIssuer(cfg.JWTSecret)
+	usersHandler := users.NewHandler(users.NewService(pool, queries, issuer))
+	authHandler := auth.NewHandler(auth.NewService(queries, issuer))
 
 	r := chi.NewRouter()
 	r.Get("/hello", helloHandler)
 	r.Get("/health", healthHandler(pool))
 	r.Post("/users", usersHandler.Create)
+	r.Post("/auth/signin", authHandler.SignIn)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

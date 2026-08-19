@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/auth"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -18,15 +19,18 @@ import (
 type Service struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
+	issuer  *auth.Issuer
 }
 
-func NewService(pool *pgxpool.Pool, queries *sqlc.Queries) *Service {
-	return &Service{pool: pool, queries: queries}
+func NewService(pool *pgxpool.Pool, queries *sqlc.Queries, issuer *auth.Issuer) *Service {
+	return &Service{pool: pool, queries: queries, issuer: issuer}
 }
 
 type createResult struct {
-	User  sqlc.User
-	Child *sqlc.Child // nil for the invite-code case, populated when a new child is created
+	User           sqlc.User
+	Child          *sqlc.Child // nil for the invite-code case, populated when a new child is created
+	Token          string
+	TokenExpiresAt time.Time
 }
 
 func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResult, *apiError) {
@@ -157,5 +161,10 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResu
 		return createResult{}, internalErr(err)
 	}
 
-	return createResult{User: newUser, Child: newChild}, nil
+	token, expiresAt, err := s.issuer.IssueToken(newUser.ID.String(), string(newUser.Role))
+	if err != nil {
+		return createResult{}, internalErr(err)
+	}
+
+	return createResult{User: newUser, Child: newChild, Token: token, TokenExpiresAt: expiresAt}, nil
 }

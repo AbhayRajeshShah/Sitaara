@@ -29,10 +29,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := CreateUserResponse{
-		ID:      result.User.ID,
-		Email:   result.User.Email,
-		Role:    result.User.Role,
-		ChildID: result.User.ChildID,
+		ID:             result.User.ID,
+		Email:          result.User.Email,
+		Role:           result.User.Role,
+		ChildID:        result.User.ChildID,
+		Token:          result.Token,
+		TokenExpiresAt: result.TokenExpiresAt,
 	}
 	if result.Child != nil {
 		resp.Child = &ChildResponse{

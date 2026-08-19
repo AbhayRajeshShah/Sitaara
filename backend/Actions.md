@@ -50,13 +50,17 @@ This document outlines all system actions, their requirements, validation steps,
     - Mark invite code as used
     - Update invite code status to "claimed"
 
-5. **Return Success**
+5. **Issue Auth Token**
+    - Mint a JWT (HS256) with `sub` = user_id and `role` as claims, valid for 30 days
+
+6. **Return Success**
     - Return 201 Created with:
         - user_id
         - email
         - role
         - child_id
         - child information (name, dob)
+        - token (JWT for immediate authenticated access, no separate sign-in required)
 
 ### Case 2: Without Invite Code
 
@@ -94,13 +98,17 @@ This document outlines all system actions, their requirements, validation steps,
         - child_id (from newly created child)
     - Return with user and child information
 
-5. **Return Success**
+5. **Issue Auth Token**
+    - Mint a JWT (HS256) with `sub` = user_id and `role` as claims, valid for 30 days
+
+6. **Return Success**
     - Return 201 Created with:
         - user_id
         - email
         - role
         - child_id
         - child information (name, dob)
+        - token (JWT for immediate authenticated access, no separate sign-in required)
 
 **Error Scenarios:**
 
@@ -147,42 +155,33 @@ This document outlines all system actions, their requirements, validation steps,
 3. **Verify Password**
     - Retrieve stored hashed password from user record
     - Compare provided password with stored hash using bcrypt or similar
-    - If password doesn't match → Return 401 Unauthorized
+    - If password doesn't match → Return 401 Unauthorized (same generic error/code as "user not found" — never reveal whether the email is registered)
 
-4. **Validate User Status** (optional)
-    - Check if user is active (not banned, not suspended)
-    - If inactive → Return 403 Forbidden with appropriate message
+4. **Create Token**
+    - Generate JWT (HS256) with `sub` = user_id and `role` as claims, valid for 30 days — same issuer/TTL used by User Creation, so tokens from either endpoint are interchangeable
 
-5. **Create Token**
-    - Generate JWT token with:
-        - user_id
-        - email
-        - role
-        - issued_at (current timestamp)
-        - expires_at (e.g., 24 hours from now)
-        - token signature/secret
-
-6. **Update User Metadata**
-    - Update user's last_login timestamp
-    - Update user's last_activity timestamp
-
-7. **Return Success**
+5. **Return Success**
     - Return 200 OK with:
-        - Auth token/JWT
         - User ID
         - User email
         - User role
+        - Auth token/JWT
         - Token expiration time
-        - (Optional) Refresh token for token renewal
 
 **Error Scenarios:**
 
 - Email not provided → 400 Bad Request
 - Password not provided → 400 Bad Request
-- User not found → 401 Unauthorized
-- Invalid password → 401 Unauthorized
-- User account inactive/suspended → 403 Forbidden
+- User not found → 401 Unauthorized (`invalid_credentials`)
+- Invalid password → 401 Unauthorized (`invalid_credentials`, identical to "user not found")
 - Database error → 500 Internal Server Error
+
+**Not implemented (schema/scope gaps, same treatment as invite-expiry in §1):**
+
+- Account-status/ban check — no status column exists on `users` and no ban/suspend feature exists anywhere yet
+- last_login/last_activity tracking — no such columns exist on `users`
+- Rate limiting / login-attempt lockout — no infra for this yet
+- Refresh token — out of scope; client re-authenticates via sign-in once the 30-day token expires
 
 **Security Considerations:**
 

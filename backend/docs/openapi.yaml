@@ -16,6 +16,8 @@ tags:
     description: Liveness and health checks
   - name: users
     description: User (parent) account creation
+  - name: auth
+    description: Authentication (sign-in, token issuance)
 
 paths:
   /hello:
@@ -85,6 +87,9 @@ paths:
         A child may have at most 2 linked users, and no two users for the
         same child may share the same `role` (enforced by a DB unique
         constraint on `(child_id, role)` plus an application-level check).
+
+        On success, a JWT (`token`) is returned, carrying the new user's id
+        (`sub`) and `role` as claims, signed HS256, valid for 30 days.
       operationId: createUser
       requestBody:
         required: true
@@ -165,6 +170,66 @@ paths:
                 error: something went wrong
                 code: internal_error
 
+  /auth/signin:
+    post:
+      tags: [auth]
+      summary: Sign in
+      description: |
+        Verifies email + password and issues a fresh JWT, per Actions.md §2
+        "User Sign In". The error response is identical (401
+        `invalid_credentials`) whether the email doesn't exist or the
+        password is wrong, so the API never reveals whether an email is
+        registered.
+
+        Not implemented from the spec (schema doesn't support them yet):
+        account-status/ban checks, and last_login/last_activity tracking.
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+            examples:
+              default:
+                value:
+                  email: mom@example.com
+                  password: correcthorse
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInResponse"
+        "400":
+          description: Missing email or password. Error code `invalid_request`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: email is required
+                code: invalid_request
+        "401":
+          description: Email not registered, or password incorrect. Error code `invalid_credentials` in both cases.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invalid email or password
+                code: invalid_credentials
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
 components:
   schemas:
     ParentRole:
@@ -211,7 +276,7 @@ components:
 
     CreateUserResponse:
       type: object
-      required: [id, email, role, childId]
+      required: [id, email, role, childId, token, tokenExpiresAt]
       properties:
         id:
           type: string
@@ -228,6 +293,46 @@ components:
           allOf:
             - $ref: "#/components/schemas/ChildResponse"
           description: Present only when a new child was created (i.e. no inviteCode was supplied).
+        token:
+          type: string
+          description: >
+            JWT signed HS256, valid 30 days. Claims: `sub` (user id),
+            `role`, `iat`, `exp`. Store securely on the client
+            (e.g. flutter_secure_storage on mobile).
+        tokenExpiresAt:
+          type: string
+          format: date-time
+
+    SignInRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    SignInResponse:
+      type: object
+      required: [id, email, role, token, tokenExpiresAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/ParentRole"
+        token:
+          type: string
+          description: >
+            JWT signed HS256, valid 30 days. Claims: `sub` (user id),
+            `role`, `iat`, `exp`.
+        tokenExpiresAt:
+          type: string
+          format: date-time
 
     ErrorBody:
       type: object

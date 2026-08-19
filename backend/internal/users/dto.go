@@ -1,6 +1,8 @@
 package users
 
 import (
+	"time"
+
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -21,9 +23,11 @@ type ChildResponse struct {
 }
 
 type CreateUserResponse struct {
-	ID      pgtype.UUID     `json:"id"`
-	Email   string          `json:"email"`
-	Role    sqlc.ParentRole `json:"role"`
-	ChildID pgtype.UUID     `json:"childId"`
-	Child   *ChildResponse  `json:"child,omitempty"`
+	ID             pgtype.UUID     `json:"id"`
+	Email          string          `json:"email"`
+	Role           sqlc.ParentRole `json:"role"`
+	ChildID        pgtype.UUID     `json:"childId"`
+	Child          *ChildResponse  `json:"child,omitempty"`
+	Token          string          `json:"token"`
+	TokenExpiresAt time.Time       `json:"tokenExpiresAt"`
 }
