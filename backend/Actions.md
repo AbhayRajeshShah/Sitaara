@@ -14,6 +14,8 @@ This document outlines all system actions, their requirements, validation steps,
 - `password` (string, required)
 - `role` (string, required)
 - `inviteCode` (string, optional)
+- `childName` (string, conditional) - required if inviteCode not provided
+- `childDob` (string, conditional) - required if inviteCode not provided (ISO 8601 format: YYYY-MM-DD)
 
 **Workflow:**
 
@@ -25,44 +27,100 @@ This document outlines all system actions, their requirements, validation steps,
     - If invalid or expired → Return 400/401 error
     - If valid → Proceed to step 2
 
-2. **Validate User Data**
+2. **Retrieve Associated Child**
+    - Query invite code to get associated child_id
+    - Retrieve child record by child_id
+    - If child not found → Return 400 error (invalid invite code data)
+    - If child is deleted/inactive → Return 400 error
+
+3. **Validate User Data**
     - Check if email already exists in system
-    - If exists → Return 400 error (email already registered)
+    - If exists → Return 409 Conflict (email already registered)
     - Validate password meets requirements (length, complexity, etc.)
     - If invalid → Return 400 error
 
-3. **Create User**
+4. **Create User**
     - Hash password
-    - Create user record with provided email, hashed password, and role
+    - Create user record with:
+        - email
+        - hashed password
+        - role
+        - child_id (from retrieved child)
     - Link user to invite code (update invite code record with user_id)
     - Mark invite code as used
+    - Update invite code status to "claimed"
 
-4. **Return Success**
-    - Return 201 Created with user ID and basic user info
+5. **Return Success**
+    - Return 201 Created with:
+        - user_id
+        - email
+        - role
+        - child_id
+        - child information (name, dob)
 
 ### Case 2: Without Invite Code
 
-1. **Validate User Data**
+1. **Validate Required Payload**
+    - Check if childName is provided
+    - If missing → Return 400 error (childName required)
+    - Check if childDob is provided
+    - If missing → Return 400 error (childDob required)
+    - Validate childDob format (ISO 8601 YYYY-MM-DD)
+    - If invalid format → Return 400 error
+
+2. **Validate User Data**
     - Check if email already exists in system
-    - If exists → Return 400 error
+    - If exists → Return 409 Conflict
     - Validate password meets requirements
     - If invalid → Return 400 error
     - Validate role is supported
     - If invalid → Return 400 error
 
-2. **Create User**
-    - Hash password
-    - Create user record with email, hashed password, and role
+3. **Create Child**
+    - Create child record with:
+        - name (from childName)
+        - dob (from childDob)
+        - created_at (current timestamp)
+        - status (active)
+    - Retrieve generated child_id
+    - If creation fails → Return 500 error
 
-3. **Return Success**
-    - Return 201 Created with user ID and basic user info
+4. **Create User**
+    - Hash password
+    - Create user record with:
+        - email
+        - hashed password
+        - role
+        - child_id (from newly created child)
+    - Return with user and child information
+
+5. **Return Success**
+    - Return 201 Created with:
+        - user_id
+        - email
+        - role
+        - child_id
+        - child information (name, dob)
 
 **Error Scenarios:**
 
 - Invalid/expired invite code → 400 Bad Request
+- Invite code has no associated child → 400 Bad Request
+- Associated child not found or inactive → 400 Bad Request
 - Email already registered → 409 Conflict
 - Invalid password → 400 Bad Request
 - Invalid role → 400 Bad Request
+- childName not provided (without invite code) → 400 Bad Request
+- childDob not provided (without invite code) → 400 Bad Request
+- Invalid childDob format → 400 Bad Request
+- Child creation failed → 500 Internal Server Error
+
+**Business Logic Notes:**
+
+- Child must exist before user creation (either pre-created via invite or created in this request)
+- One user per child (enforce unique child_id in users table)
+- Invite codes are reusable until claimed (after claiming, child is associated with a user)
+- Invite codes automatically transition from "active" to "claimed" status upon successful user creation
 
 ---
 
