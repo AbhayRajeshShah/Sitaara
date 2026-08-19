@@ -1,0 +1,11 @@
+.env
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/server
+/cmd/server/server
+vendor/
