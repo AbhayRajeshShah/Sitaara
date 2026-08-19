@@ -80,3 +80,35 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	)
 	return i, err
 }
+
+const listUsersByChildID = `-- name: ListUsersByChildID :many
+SELECT id, email, password_hash, role, child_id, created_at FROM users
+WHERE child_id = $1
+`
+
+func (q *Queries) ListUsersByChildID(ctx context.Context, childID pgtype.UUID) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsersByChildID, childID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.Role,
+			&i.ChildID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

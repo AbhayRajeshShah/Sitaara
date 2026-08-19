@@ -10,3 +10,7 @@ WHERE email = $1;
 -- name: GetUserByID :one
 SELECT * FROM users
 WHERE id = $1;
+
+-- name: ListUsersByChildID :many
+SELECT * FROM users
+WHERE child_id = $1;

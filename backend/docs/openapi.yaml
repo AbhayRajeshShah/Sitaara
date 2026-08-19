@@ -1,0 +1,241 @@
+openapi: 3.1.0
+info:
+  title: Sitaara Backend API
+  description: >
+    API for the Sitaara backend. Manually maintained — update this file
+    whenever routes, request/response shapes, or error codes change in
+    cmd/server/main.go or the internal/* handler packages.
+  version: "0.1.0"
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: system
+    description: Liveness and health checks
+  - name: users
+    description: User (parent) account creation
+
+paths:
+  /hello:
+    get:
+      tags: [system]
+      summary: Liveness check
+      description: Trivial handler used to confirm the server process is up and routing requests.
+      operationId: hello
+      responses:
+        "200":
+          description: Server is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: hello
+                required: [message]
+
+  /health:
+    get:
+      tags: [system]
+      summary: Health check
+      description: Pings the database connection pool to confirm the server can reach Postgres.
+      operationId: health
+      responses:
+        "200":
+          description: Server and database are healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required: [status]
+        "503":
+          description: Database ping failed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                required: [status]
+
+  /users:
+    post:
+      tags: [users]
+      summary: Create a user (parent account)
+      description: |
+        Creates a parent user account, per Actions.md §1 "User Creation".
+
+        Two mutually exclusive input shapes:
+        - **With `inviteCode`**: the child already linked to that invite code
+          is reused. `childName`/`childDob` are ignored if present. The
+          invite code is marked redeemed and the response omits `child`.
+        - **Without `inviteCode`**: `childName` and `childDob` are required
+          and a new child record is created first. The response includes
+          the created `child`.
+
+        A child may have at most 2 linked users, and no two users for the
+        same child may share the same `role` (enforced by a DB unique
+        constraint on `(child_id, role)` plus an application-level check).
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+            examples:
+              withInviteCode:
+                summary: Second parent joining via invite code
+                value:
+                  email: dad@example.com
+                  password: correcthorse
+                  role: dad
+                  inviteCode: ABC123XYZ
+              withNewChild:
+                summary: First parent, creates a new child
+                value:
+                  email: mom@example.com
+                  password: correcthorse
+                  role: mom
+                  childName: Ada
+                  childDob: "2023-05-01"
+      responses:
+        "201":
+          description: User created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUserResponse"
+        "400":
+          description: >
+            Validation failure — malformed JSON, missing/invalid email,
+            password, or role, missing childName/childDob when inviteCode
+            is absent, or an invalid/future childDob. Always uses error
+            code `invalid_request`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: password must be at least 8 characters
+                code: invalid_request
+        "404":
+          description: Invite code does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invite code not found
+                code: invite_not_found
+        "409":
+          description: >
+            Conflict — one of: email already registered, invite code
+            already redeemed, child already has two linked parents, or
+            child already has a user with the requested role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                emailTaken:
+                  value: { error: email is already registered, code: email_already_registered }
+                inviteUsed:
+                  value: { error: invite code has already been redeemed, code: invite_already_used }
+                twoParents:
+                  value: { error: this child already has two linked parents, code: child_has_two_parents }
+                roleTaken:
+                  value: { error: this child already has a mom, code: child_already_has_role }
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+components:
+  schemas:
+    ParentRole:
+      type: string
+      enum: [mom, dad, guardian]
+
+    CreateUserRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+          description: 72-byte max is bcrypt's hard truncation limit; longer values are rejected rather than silently truncated.
+        role:
+          $ref: "#/components/schemas/ParentRole"
+        inviteCode:
+          type: string
+          description: If present, the user joins the child already linked to this code. Mutually exclusive with childName/childDob.
+        childName:
+          type: string
+          description: Required if inviteCode is absent.
+        childDob:
+          type: string
+          format: date
+          description: Required if inviteCode is absent. Strict YYYY-MM-DD; must not be in the future.
+
+    ChildResponse:
+      type: object
+      required: [id, name, dob]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        dob:
+          type: string
+          format: date
+
+    CreateUserResponse:
+      type: object
+      required: [id, email, role, childId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/ParentRole"
+        childId:
+          type: string
+          format: uuid
+        child:
+          allOf:
+            - $ref: "#/components/schemas/ChildResponse"
+          description: Present only when a new child was created (i.e. no inviteCode was supplied).
+
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+        code:
+          type: string
+          description: Machine-readable error code for client branching.

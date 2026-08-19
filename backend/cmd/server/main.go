@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +11,9 @@ import (
 
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/config"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db"
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/httpx"
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/users"
 	"github.com/AbhayRajeshShah/Sitaara/backend/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,9 +36,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	queries := sqlc.New(pool)
+	usersHandler := users.NewHandler(users.NewService(pool, queries))
+
 	r := chi.NewRouter()
 	r.Get("/hello", helloHandler)
 	r.Get("/health", healthHandler(pool))
+	r.Post("/users", usersHandler.Create)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
@@ -62,21 +68,15 @@ func main() {
 }
 
 func helloHandler(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"message": "hello"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"message": "hello"})
 }
 
 func healthHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := pool.Ping(r.Context()); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unhealthy"})
+			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unhealthy"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
 }
