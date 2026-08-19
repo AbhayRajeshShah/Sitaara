@@ -12,6 +12,7 @@ import (
 
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/config"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db"
+	"github.com/AbhayRajeshShah/Sitaara/backend/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,6 +29,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
+
+	if err := db.RunMigrations(cfg.DatabaseURL, migrations.FS); err != nil {
+		log.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 	r.Get("/hello", helloHandler)
