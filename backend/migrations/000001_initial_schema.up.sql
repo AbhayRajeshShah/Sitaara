@@ -1,7 +1,13 @@
 CREATE TYPE parent_role AS ENUM ('mom', 'dad', 'guardian');
 
+CREATE TABLE families (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE children (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    family_id UUID NOT NULL REFERENCES families (id) ON DELETE RESTRICT,
     name VARCHAR(255) NOT NULL CHECK (btrim(name) <> ''),
     date_of_birth DATE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -12,9 +18,10 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role parent_role NOT NULL,
-    child_id UUID NOT NULL REFERENCES children (id) ON DELETE RESTRICT,
+    family_id UUID NOT NULL REFERENCES families (id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT users_email_unique UNIQUE (email)
+    CONSTRAINT users_email_unique UNIQUE (email),
+    CONSTRAINT users_family_role_unique UNIQUE (family_id, role)
 );
 
 CREATE TABLE masterclasses (
@@ -55,7 +62,7 @@ CREATE TABLE invite_codes (
     code VARCHAR(32) NOT NULL,
     generated_by_user_id UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
     redeemed_by_user_id UUID REFERENCES users (id) ON DELETE RESTRICT,
-    child_id UUID NOT NULL REFERENCES children (id) ON DELETE RESTRICT,
+    family_id UUID NOT NULL REFERENCES families (id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     redeemed_at TIMESTAMPTZ,
     CONSTRAINT invite_codes_code_unique UNIQUE (code),
@@ -64,17 +71,8 @@ CREATE TABLE invite_codes (
     )
 );
 
-CREATE TABLE partner_relationships (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id_1 UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
-    user_id_2 UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
-    child_id UUID NOT NULL REFERENCES children (id) ON DELETE RESTRICT,
-    linked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT partner_user_order CHECK (user_id_1 < user_id_2),
-    CONSTRAINT partner_relationships_unique UNIQUE (user_id_1, user_id_2, child_id)
-);
-
-CREATE INDEX idx_users_child_id ON users (child_id);
+CREATE INDEX idx_children_family_id ON children (family_id);
+CREATE INDEX idx_users_family_id ON users (family_id);
 
 CREATE INDEX idx_videos_masterclass_id ON videos (masterclass_id);
 
@@ -86,7 +84,4 @@ CREATE INDEX idx_watch_progress_video_id ON watch_progress (video_id);
 
 CREATE INDEX idx_invite_codes_generated_by ON invite_codes (generated_by_user_id);
 CREATE INDEX idx_invite_codes_redeemed_by ON invite_codes (redeemed_by_user_id);
-
-CREATE INDEX idx_partner_relationships_user_id_1 ON partner_relationships (user_id_1);
-CREATE INDEX idx_partner_relationships_user_id_2 ON partner_relationships (user_id_2);
-CREATE INDEX idx_partner_relationships_child_id ON partner_relationships (child_id);
+CREATE INDEX idx_invite_codes_family_id ON invite_codes (family_id);

@@ -32,7 +32,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ID:             result.User.ID,
 		Email:          result.User.Email,
 		Role:           result.User.Role,
-		ChildID:        result.User.ChildID,
+		FamilyID:       result.User.FamilyID,
 		Token:          result.Token,
 		TokenExpiresAt: result.TokenExpiresAt,
 	}

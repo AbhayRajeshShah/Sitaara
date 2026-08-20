@@ -15,6 +15,7 @@ import (
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/httpx"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/users"
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/videos"
 	"github.com/AbhayRajeshShah/Sitaara/backend/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,12 +42,18 @@ func main() {
 	issuer := auth.NewIssuer(cfg.JWTSecret)
 	usersHandler := users.NewHandler(users.NewService(pool, queries, issuer))
 	authHandler := auth.NewHandler(auth.NewService(queries, issuer))
+	videosHandler := videos.NewHandler(videos.NewService(queries))
 
 	r := chi.NewRouter()
 	r.Get("/hello", helloHandler)
 	r.Get("/health", healthHandler(pool))
 	r.Post("/users", usersHandler.Create)
 	r.Post("/auth/signin", authHandler.SignIn)
+
+	r.Group(func(r chi.Router) {
+		r.Use(issuer.RequireAuth)
+		r.Get("/videos/{id}/partner-activity", videosHandler.GetFamilyActivity)
+	})
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

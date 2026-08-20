@@ -88,7 +88,7 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResu
 
 	q := s.queries.WithTx(tx)
 
-	var childID pgtype.UUID
+	var familyID pgtype.UUID
 	var invite sqlc.InviteCode
 	var newChild *sqlc.Child
 
@@ -102,33 +102,38 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResu
 		if invite.RedeemedByUserID.Valid {
 			return createResult{}, conflict("invite_already_used", "invite code has already been redeemed")
 		}
-		childID = invite.ChildID
+		familyID = invite.FamilyID
 	} else {
-		c, err := q.CreateChild(ctx, sqlc.CreateChildParams{Name: childName, DateOfBirth: childDOB})
+		f, err := q.CreateFamily(ctx)
+		if err != nil {
+			return createResult{}, internalErr(err)
+		}
+		familyID = f.ID
+
+		c, err := q.CreateChild(ctx, sqlc.CreateChildParams{FamilyID: familyID, Name: childName, DateOfBirth: childDOB})
 		if err != nil {
 			return createResult{}, internalErr(err)
 		}
 		newChild = &c
-		childID = c.ID
 	}
 
-	// Serialize concurrent user-creation attempts for this child_id — closes
-	// the race that unique(child_id, role) alone can't (it prevents duplicate
+	// Serialize concurrent user-creation attempts for this family_id — closes
+	// the race that unique(family_id, role) alone can't (it prevents duplicate
 	// roles but not a total count above 2, since 3 roles exist).
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text)::bigint)`, childID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1::text)::bigint)`, familyID); err != nil {
 		return createResult{}, internalErr(err)
 	}
 
-	existing, err := q.ListUsersByChildID(ctx, childID)
+	existing, err := q.ListUsersByFamilyID(ctx, familyID)
 	if err != nil {
 		return createResult{}, internalErr(err)
 	}
 	if len(existing) >= 2 {
-		return createResult{}, conflict("child_has_two_parents", "this child already has two linked parents")
+		return createResult{}, conflict("family_has_two_parents", "this family already has two linked parents")
 	}
 	for _, u := range existing {
 		if u.Role == role {
-			return createResult{}, conflict("child_already_has_role", fmt.Sprintf("this child already has a %s", role))
+			return createResult{}, conflict("family_already_has_role", fmt.Sprintf("this family already has a %s", role))
 		}
 	}
 
@@ -136,14 +141,14 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResu
 		Email:        req.Email,
 		PasswordHash: string(hash),
 		Role:         role,
-		ChildID:      childID,
+		FamilyID:     familyID,
 	})
 	if err != nil {
 		if isUniqueViolation(err, "users_email_unique") {
 			return createResult{}, conflict("email_already_registered", "email is already registered")
 		}
-		if isUniqueViolation(err, "users_child_role_unique") {
-			return createResult{}, conflict("child_already_has_role", fmt.Sprintf("this child already has a %s", role))
+		if isUniqueViolation(err, "users_family_role_unique") {
+			return createResult{}, conflict("family_already_has_role", fmt.Sprintf("this family already has a %s", role))
 		}
 		return createResult{}, internalErr(err)
 	}

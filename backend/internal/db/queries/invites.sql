@@ -1,5 +1,5 @@
 -- name: CreateInvite :one
-INSERT INTO invite_codes (code, generated_by_user_id, child_id)
+INSERT INTO invite_codes (code, generated_by_user_id, family_id)
 VALUES ($1, $2, $3)
 RETURNING *;
 

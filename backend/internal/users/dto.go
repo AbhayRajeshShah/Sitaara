@@ -26,7 +26,7 @@ type CreateUserResponse struct {
 	ID             pgtype.UUID     `json:"id"`
 	Email          string          `json:"email"`
 	Role           sqlc.ParentRole `json:"role"`
-	ChildID        pgtype.UUID     `json:"childId"`
+	FamilyID       pgtype.UUID     `json:"familyId"`
 	Child          *ChildResponse  `json:"child,omitempty"`
 	Token          string          `json:"token"`
 	TokenExpiresAt time.Time       `json:"tokenExpiresAt"`

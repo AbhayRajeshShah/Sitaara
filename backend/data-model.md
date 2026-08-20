@@ -8,6 +8,19 @@ This document describes the PostgreSQL schema for the Sitaara partner-linking ap
 
 ## Database Entities
 
+### Families
+Represents a couple/household — the shared anchor that both parent accounts and their child(ren) hang off of.
+
+**Fields:**
+- `id` (PK, UUID/Serial) — Primary key
+- `created_at` (TIMESTAMP, NOT NULL) — Family creation timestamp
+
+**Notes:**
+- Both `users` and `children` reference `family_id` directly, so any "shared between partners" query is a single `WHERE family_id = ?` — no join table required
+- Created either when the first parent signs up without an invite code, or resolved from the invite code when a second parent joins
+
+---
+
 ### Users
 Represents a parent account with authentication and role information.
 
@@ -16,12 +29,13 @@ Represents a parent account with authentication and role information.
 - `email` (VARCHAR, UNIQUE, NOT NULL) — Email address used for login and identification
 - `password_hash` (VARCHAR, NOT NULL) — Securely hashed password (bcrypt or similar)
 - `role` (ENUM/VARCHAR, NOT NULL) — Either "Mom" or "Dad"
-- `child_id` (FK to Children, NOT NULL) — Reference to the shared child
+- `family_id` (FK to Families, NOT NULL) — Reference to the shared family
 - `created_at` (TIMESTAMP, NOT NULL) — Account creation timestamp
 
 **Constraints:**
 - Email must be unique across the system
-- Each user is linked to exactly one child (one couple, one child)
+- Each user belongs to exactly one family
+- `UNIQUE(family_id, role)` — a family can have at most one `mom`, one `dad`, and one `guardian` (in practice, at most two users total for the current scope)
 
 **Notes:**
 - Password should be hashed using bcrypt, argon2, or similar before storage
@@ -30,10 +44,11 @@ Represents a parent account with authentication and role information.
 ---
 
 ### Children
-Represents a shared child profile owned by a couple.
+Represents a shared child profile owned by a family.
 
 **Fields:**
 - `id` (PK, UUID/Serial) — Primary key
+- `family_id` (FK to Families, NOT NULL) — Reference to the owning family
 - `name` (VARCHAR, NOT NULL) — Child's name
 - `date_of_birth` (DATE, NOT NULL) — Child's date of birth
 - `created_at` (TIMESTAMP, NOT NULL) — Profile creation timestamp
@@ -42,7 +57,7 @@ Represents a shared child profile owned by a couple.
 - Name should not be empty
 
 **Notes:**
-- Each child is shared between exactly two users (one couple)
+- A family may eventually contain multiple children; for the current scope each family has exactly one
 - The demo only requires one child instance, but the schema is designed to be extensible for future features
 
 ---
@@ -134,7 +149,7 @@ Tracks invite codes for partner linking, including generation and redemption sta
 - `code` (VARCHAR, UNIQUE, NOT NULL) — The human-readable invite code (e.g., "ABC123XYZ")
 - `generated_by_user_id` (FK to Users, NOT NULL) — User who generated the code
 - `redeemed_by_user_id` (FK to Users, NULLABLE) — User who redeemed the code (NULL until redeemed)
-- `child_id` (FK to Children, NOT NULL) — The child being linked (always the child of the generating user)
+- `family_id` (FK to Families, NOT NULL) — The family being joined (always the family of the generating user)
 - `created_at` (TIMESTAMP, NOT NULL) — When the code was generated
 - `redeemed_at` (TIMESTAMP, NULLABLE) — When the code was redeemed (NULL until redeemed)
 
@@ -151,38 +166,13 @@ Tracks invite codes for partner linking, including generation and redemption sta
 
 ---
 
-### Partner Relationships
-Tracks mutual partner links between two users on a shared child.
-
-**Fields:**
-- `id` (PK, UUID/Serial) — Primary key
-- `user_id_1` (FK to Users, NOT NULL) — First user in the relationship
-- `user_id_2` (FK to Users, NOT NULL) — Second user in the relationship
-- `child_id` (FK to Children, NOT NULL) — The shared child
-- `linked_at` (TIMESTAMP, NOT NULL) — When the link was established
-
-**Constraints:**
-- `UNIQUE(user_id_1, user_id_2, child_id)` — Prevents duplicate partner relationships
-- `user_id_1 < user_id_2` (enforce ordering to prevent both (A, B) and (B, A) existing) — Recommended
-- `user_id_1 != user_id_2` (self-linking prevention, enforced at application logic level)
-
-**Notes:**
-- Relationships are **symmetric**: if (A, B) exists, it means both A and B are linked to each other
-- To find a user's partner: `SELECT * FROM partner_relationships WHERE (user_id_1 = ? OR user_id_2 = ?) AND child_id = ?`
-- To check if two users are linked: `SELECT * FROM partner_relationships WHERE (user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?) AND child_id = ?`
-- Enforce `user_id_1 < user_id_2` at the application layer to avoid duplicates (e.g., don't allow both (1, 2) and (2, 1))
-
----
-
 ## Key Design Decisions
 
-### 1. One Child Per Couple
-Each user has a foreign key to a single child in the `users` table. This enforces that:
-- A user (parent) is bound to one child for the demo
-- Both users in a couple reference the same child
-- The relationship is simple and unambiguous
-
-**Future scaling**: If supporting multiple children per couple is needed, a many-to-many junction table (users_children) would replace the direct foreign key.
+### 1. One Family Per Couple
+Each user has a foreign key to a single family in the `users` table, and each child has a foreign key to the family that owns it. This enforces that:
+- A user (parent) is bound to one family
+- Both users in a couple reference the same family, and any children they share reference that same family
+- The relationship is simple and unambiguous, and already supports multiple children per family natively (`children.family_id` is one-to-many) — no junction table needed for that scaling case
 
 ### 2. Idempotent Watch Progress
 Watch progress is stored as a single record per user per video with a `UNIQUE(user_id, video_id)` constraint. Updates are idempotent via the "furthest-watched wins" rule:
@@ -198,16 +188,15 @@ Invite codes are consumed immediately upon redemption:
 
 **Concurrent safety**: Use database transactions with row-level locking (`SELECT ... FOR UPDATE`) when redeeming to ensure only one user can redeem a code simultaneously.
 
-### 4. Symmetric Partner Relationships
-Partner relationships are bidirectional and stored as a single record with ordering (user_id_1 < user_id_2) to prevent duplicates:
-- If A and B are linked, there is exactly one record with (user_id_1=A, user_id_2=B) or (user_id_1=B, user_id_2=A)
-- Recommended: enforce `user_id_1 < user_id_2` at the application layer to maintain consistency
-- Queries must check both directions: `(user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?)`
+### 4. Family Membership
+Two users are partners simply by sharing the same `family_id` — no separate relationship table or bidirectional record-keeping is needed:
+- To find a user's partner: `SELECT * FROM users WHERE family_id = ? AND id != ?`
+- "Are these two users linked?" is just `u1.family_id = u2.family_id`, comparable directly from two already-loaded rows
 
 ### 5. Authorization Boundary
 All shared activity queries must verify:
-1. The logged-in user is linked to their partner via `partner_relationships` on the shared child
-2. The queried data belongs to the shared child only
+1. The logged-in user and the target user share the same `family_id`
+2. The queried data belongs to the shared family (via its owning user or child) only
 3. The queried partner data belongs to the linked partner only
 
 Example authorization check (pseudocode):
@@ -215,7 +204,7 @@ Example authorization check (pseudocode):
 GET /videos/{id}/partner-activity
 - User is authenticated
 - Video exists
-- User and partner are linked on the shared child
+- User and partner share the same family_id
 - Return partner's like state and progress
 ```
 
@@ -224,47 +213,29 @@ GET /videos/{id}/partner-activity
 ## Entity Relationship Diagram (ERD)
 
 ```
-┌────────────────┐
-│     Users      │
-├────────────────┤
-│ id (PK)        │
-│ email (UNIQUE) │
-│ password_hash  │
-│ role           │
-│ child_id (FK)  │ ──────────┐
-│ created_at     │           │
-└────────────────┘           │
-         │                   │
-         │ 1                 │ N
-         │                   │
-         └──────────┬────────┘
-                    │
-                    ▼
-          ┌──────────────────┐
-          │    Children      │
-          ├──────────────────┤
-          │ id (PK)          │
-          │ name             │
-          │ date_of_birth    │
-          │ created_at       │
-          └──────────────────┘
-                    │
-        ┌───────────┼───────────┐
-        │           │           │
-        │ 1         │ 1         │ N
-        │           │           │
-        ▼           ▼           ▼
-┌──────────────────────────────────────────────┐
-│                                              │
-│  partner_relationships                       │
-│  ├─ id (PK)                                 │
-│  ├─ user_id_1 (FK) ──────┐                 │
-│  ├─ user_id_2 (FK) ──────┼─────────────────┤
-│  ├─ child_id (FK) ────────┘                 │
-│  └─ linked_at                               │
-│  UNIQUE(user_id_1, user_id_2, child_id)    │
-│                                              │
-└──────────────────────────────────────────────┘
+                    ┌──────────────────┐
+                    │     Families      │
+                    ├──────────────────┤
+                    │ id (PK)          │
+                    │ created_at       │
+                    └──────────────────┘
+                       │             │
+                       │ 1           │ 1
+                       │             │
+                       │ N           │ N
+                       ▼             ▼
+        ┌────────────────┐   ┌──────────────────┐
+        │     Users      │   │    Children      │
+        ├────────────────┤   ├──────────────────┤
+        │ id (PK)        │   │ id (PK)          │
+        │ email (UNIQUE) │   │ family_id (FK)   │
+        │ password_hash  │   │ name             │
+        │ role           │   │ date_of_birth    │
+        │ family_id (FK) │   │ created_at       │
+        │ created_at     │   └──────────────────┘
+        │ UNIQUE(family  │
+        │  _id, role)    │
+        └────────────────┘
 
 ┌──────────────────────────────────────────────┐
 │                                              │
@@ -273,11 +244,12 @@ GET /videos/{id}/partner-activity
 │  ├─ code (UNIQUE)                           │
 │  ├─ generated_by_user_id (FK) ────┐        │
 │  ├─ redeemed_by_user_id (FK)      ├────────┤
-│  ├─ child_id (FK) ─────────────────┤        │
+│  ├─ family_id (FK) ────────────────┤        │
 │  ├─ created_at                     │        │
 │  └─ redeemed_at                    │        │
 │                                    │        │
 │  Points to Users (generator)   Points to Users (redeemer)
+│  family_id points to Families                │
 │                                              │
 └──────────────────────────────────────────────┘
 
@@ -344,7 +316,10 @@ For optimal query performance, consider the following indexes:
 ```sql
 -- Users
 CREATE UNIQUE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_child_id ON users(child_id);
+CREATE INDEX idx_users_family_id ON users(family_id);
+
+-- Children
+CREATE INDEX idx_children_family_id ON children(family_id);
 
 -- Video Likes (for quick lookup)
 CREATE INDEX idx_video_likes_user_id ON video_likes(user_id);
@@ -358,11 +333,7 @@ CREATE INDEX idx_watch_progress_video_id ON watch_progress(video_id);
 CREATE UNIQUE INDEX idx_invite_codes_code ON invite_codes(code);
 CREATE INDEX idx_invite_codes_generated_by ON invite_codes(generated_by_user_id);
 CREATE INDEX idx_invite_codes_redeemed_by ON invite_codes(redeemed_by_user_id);
-
--- Partner Relationships (for finding partners and checking links)
-CREATE INDEX idx_partner_relationships_user_id_1 ON partner_relationships(user_id_1);
-CREATE INDEX idx_partner_relationships_user_id_2 ON partner_relationships(user_id_2);
-CREATE INDEX idx_partner_relationships_child_id ON partner_relationships(child_id);
+CREATE INDEX idx_invite_codes_family_id ON invite_codes(family_id);
 
 -- Videos (for browse and lookup)
 CREATE INDEX idx_videos_masterclass_id ON videos(masterclass_id);
@@ -372,24 +343,14 @@ CREATE INDEX idx_videos_masterclass_id ON videos(masterclass_id);
 
 ## Query Patterns
 
-### Find a user's partner for a shared child
+### Find a user's partner in the same family
 ```sql
-SELECT CASE
-    WHEN user_id_1 = ? THEN user_id_2
-    WHEN user_id_2 = ? THEN user_id_1
-END AS partner_user_id
-FROM partner_relationships
-WHERE (user_id_1 = ? OR user_id_2 = ?)
-  AND child_id = ?;
+SELECT * FROM users
+WHERE family_id = ? AND id != ?;
 ```
 
-### Check if two users are linked on a child
-```sql
-SELECT COUNT(*) > 0 AS is_linked
-FROM partner_relationships
-WHERE ((user_id_1 = ? AND user_id_2 = ?) OR (user_id_1 = ? AND user_id_2 = ?))
-  AND child_id = ?;
-```
+### Check if two users are linked
+No query needed — compare two already-loaded rows' `family_id` values directly (`u1.family_id = u2.family_id`).
 
 ### Get a user's watch progress for a video
 ```sql
@@ -402,34 +363,26 @@ WHERE user_id = ? AND video_id = ?;
 ```sql
 SELECT wp.watched_seconds, wp.last_updated_at
 FROM watch_progress wp
-WHERE wp.user_id = ? -- partner's user_id
-  AND wp.video_id = ?
-  AND EXISTS (
-    SELECT 1 FROM partner_relationships pr
-    WHERE (pr.user_id_1 = ? AND pr.user_id_2 = ?) 
-       OR (pr.user_id_1 = ? AND pr.user_id_2 = ?)
-    AND pr.child_id = ?
-  );
+JOIN users u ON u.id = wp.user_id
+WHERE wp.video_id = ?
+  AND u.family_id = (SELECT family_id FROM users WHERE id = ?) -- requesting user's family
+  AND u.id != ?; -- exclude the requesting user, return only the partner
 ```
 
 ### Get partner's like state for a video (with authorization check)
 ```sql
 SELECT COUNT(*) > 0 AS liked_by_partner
 FROM video_likes vl
-WHERE vl.user_id = ? -- partner's user_id
-  AND vl.video_id = ?
-  AND EXISTS (
-    SELECT 1 FROM partner_relationships pr
-    WHERE (pr.user_id_1 = ? AND pr.user_id_2 = ?) 
-       OR (pr.user_id_1 = ? AND pr.user_id_2 = ?)
-    AND pr.child_id = ?
-  );
+JOIN users u ON u.id = vl.user_id
+WHERE vl.video_id = ?
+  AND u.family_id = (SELECT family_id FROM users WHERE id = ?) -- requesting user's family
+  AND u.id != ?; -- exclude the requesting user, return only the partner
 ```
 
 ### Redeem an invite code (with transaction and locking)
 ```sql
 BEGIN TRANSACTION;
-SELECT id, generated_by_user_id, redeemed_by_user_id, child_id
+SELECT id, generated_by_user_id, redeemed_by_user_id, family_id
 FROM invite_codes
 WHERE code = ?
 FOR UPDATE; -- Lock the row
@@ -441,10 +394,10 @@ ELSE
   UPDATE invite_codes
   SET redeemed_by_user_id = ?, redeemed_at = NOW()
   WHERE code = ?;
-  
-  INSERT INTO partner_relationships (user_id_1, user_id_2, child_id, linked_at)
-  VALUES (MIN(generated_by_user_id, ?), MAX(generated_by_user_id, ?), child_id, NOW());
-  
+
+  -- No separate relationship row needed: the redeeming user is simply
+  -- created with family_id = invite_codes.family_id.
+
   COMMIT;
 END IF;
 ```
@@ -501,7 +454,7 @@ CREATE TABLE masterclasses (...)
 
 ## Notes for Implementation
 
-1. **Transactions**: Critical operations (invite code redemption, partner linking) must use database transactions with proper isolation levels to prevent race conditions.
+1. **Transactions**: Critical operations (invite code redemption) must use database transactions with proper isolation levels to prevent race conditions.
 
 2. **Timestamp Handling**: All timestamps should be stored in UTC. Use `NOW()` or the equivalent in your language/driver.
 

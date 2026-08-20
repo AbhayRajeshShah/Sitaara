@@ -27,11 +27,11 @@ This document outlines all system actions, their requirements, validation steps,
     - If invalid or expired → Return 400/401 error
     - If valid → Proceed to step 2
 
-2. **Retrieve Associated Child**
-    - Query invite code to get associated child_id
-    - Retrieve child record by child_id
-    - If child not found → Return 400 error (invalid invite code data)
-    - If child is deleted/inactive → Return 400 error
+2. **Retrieve Associated Family**
+    - Query invite code to get associated family_id
+    - Retrieve family record by family_id
+    - If family not found → Return 400 error (invalid invite code data)
+    - If family is deleted/inactive → Return 400 error
 
 3. **Validate User Data**
     - Check if email already exists in system
@@ -45,7 +45,7 @@ This document outlines all system actions, their requirements, validation steps,
         - email
         - hashed password
         - role
-        - child_id (from retrieved child)
+        - family_id (from retrieved invite)
     - Link user to invite code (update invite code record with user_id)
     - Mark invite code as used
     - Update invite code status to "claimed"
@@ -58,7 +58,7 @@ This document outlines all system actions, their requirements, validation steps,
         - user_id
         - email
         - role
-        - child_id
+        - family_id
         - child information (name, dob)
         - token (JWT for immediate authenticated access, no separate sign-in required)
 
@@ -80,13 +80,16 @@ This document outlines all system actions, their requirements, validation steps,
     - Validate role is supported
     - If invalid → Return 400 error
 
-3. **Create Child**
+3. **Create Family, then Create Child**
+    - Create family record with:
+        - created_at (current timestamp)
+    - Retrieve generated family_id
     - Create child record with:
+        - family_id (from newly created family)
         - name (from childName)
         - dob (from childDob)
         - created_at (current timestamp)
         - status (active)
-    - Retrieve generated child_id
     - If creation fails → Return 500 error
 
 4. **Create User**
@@ -95,7 +98,7 @@ This document outlines all system actions, their requirements, validation steps,
         - email
         - hashed password
         - role
-        - child_id (from newly created child)
+        - family_id (from newly created family)
     - Return with user and child information
 
 5. **Issue Auth Token**
@@ -106,15 +109,15 @@ This document outlines all system actions, their requirements, validation steps,
         - user_id
         - email
         - role
-        - child_id
+        - family_id
         - child information (name, dob)
         - token (JWT for immediate authenticated access, no separate sign-in required)
 
 **Error Scenarios:**
 
 - Invalid/expired invite code → 400 Bad Request
-- Invite code has no associated child → 400 Bad Request
-- Associated child not found or inactive → 400 Bad Request
+- Invite code has no associated family → 400 Bad Request
+- Associated family not found or inactive → 400 Bad Request
 - Email already registered → 409 Conflict
 - Invalid password → 400 Bad Request
 - Invalid role → 400 Bad Request
@@ -125,9 +128,9 @@ This document outlines all system actions, their requirements, validation steps,
 
 **Business Logic Notes:**
 
-- Child must exist before user creation (either pre-created via invite or created in this request)
-- One user per child (enforce unique child_id in users table)
-- Invite codes are reusable until claimed (after claiming, child is associated with a user)
+- A family (and its child) must exist before user creation (either pre-created via invite or created in this request)
+- One user per role per family (enforce unique (family_id, role) in users table)
+- Invite codes are reusable until claimed (after claiming, family is associated with a second user)
 - Invite codes automatically transition from "active" to "claimed" status upon successful user creation
 
 ---

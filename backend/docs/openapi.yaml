@@ -77,16 +77,16 @@ paths:
         Creates a parent user account, per Actions.md §1 "User Creation".
 
         Two mutually exclusive input shapes:
-        - **With `inviteCode`**: the child already linked to that invite code
-          is reused. `childName`/`childDob` are ignored if present. The
+        - **With `inviteCode`**: the family already linked to that invite
+          code is joined. `childName`/`childDob` are ignored if present. The
           invite code is marked redeemed and the response omits `child`.
         - **Without `inviteCode`**: `childName` and `childDob` are required
-          and a new child record is created first. The response includes
-          the created `child`.
+          and a new family and child record are created first. The response
+          includes the created `child`.
 
-        A child may have at most 2 linked users, and no two users for the
-        same child may share the same `role` (enforced by a DB unique
-        constraint on `(child_id, role)` plus an application-level check).
+        A family may have at most 2 linked users, and no two users in the
+        same family may share the same `role` (enforced by a DB unique
+        constraint on `(family_id, role)` plus an application-level check).
 
         On success, a JWT (`token`) is returned, carrying the new user's id
         (`sub`) and `role` as claims, signed HS256, valid for 30 days.
@@ -145,8 +145,8 @@ paths:
         "409":
           description: >
             Conflict — one of: email already registered, invite code
-            already redeemed, child already has two linked parents, or
-            child already has a user with the requested role.
+            already redeemed, family already has two linked parents, or
+            family already has a user with the requested role.
           content:
             application/json:
               schema:
@@ -157,9 +157,9 @@ paths:
                 inviteUsed:
                   value: { error: invite code has already been redeemed, code: invite_already_used }
                 twoParents:
-                  value: { error: this child already has two linked parents, code: child_has_two_parents }
+                  value: { error: this family already has two linked parents, code: family_has_two_parents }
                 roleTaken:
-                  value: { error: this child already has a mom, code: child_already_has_role }
+                  value: { error: this family already has a mom, code: family_already_has_role }
         "500":
           description: Unexpected internal/database error.
           content:
@@ -252,7 +252,7 @@ components:
           $ref: "#/components/schemas/ParentRole"
         inviteCode:
           type: string
-          description: If present, the user joins the child already linked to this code. Mutually exclusive with childName/childDob.
+          description: If present, the user joins the family already linked to this code. Mutually exclusive with childName/childDob.
         childName:
           type: string
           description: Required if inviteCode is absent.
@@ -276,7 +276,7 @@ components:
 
     CreateUserResponse:
       type: object
-      required: [id, email, role, childId, token, tokenExpiresAt]
+      required: [id, email, role, familyId, token, tokenExpiresAt]
       properties:
         id:
           type: string
@@ -286,7 +286,7 @@ components:
           format: email
         role:
           $ref: "#/components/schemas/ParentRole"
-        childId:
+        familyId:
           type: string
           format: uuid
         child:

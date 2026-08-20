@@ -4,7 +4,6 @@ sql:
     queries: "internal/db/queries"
     schema:
       - "migrations/000001_initial_schema.up.sql"
-      - "migrations/000003_child_role_unique.up.sql"
     gen:
       go:
         package: "sqlc"

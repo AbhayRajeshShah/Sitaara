@@ -1,5 +1,5 @@
 -- name: CreateUser :one
-INSERT INTO users (email, password_hash, role, child_id)
+INSERT INTO users (email, password_hash, role, family_id)
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
@@ -11,6 +11,6 @@ WHERE email = $1;
 SELECT * FROM users
 WHERE id = $1;
 
--- name: ListUsersByChildID :many
+-- name: ListUsersByFamilyID :many
 SELECT * FROM users
-WHERE child_id = $1;
+WHERE family_id = $1;

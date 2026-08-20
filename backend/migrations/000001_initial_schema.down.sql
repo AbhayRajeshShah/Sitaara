@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS partner_relationships;
 DROP TABLE IF EXISTS invite_codes;
 DROP TABLE IF EXISTS watch_progress;
 DROP TABLE IF EXISTS video_likes;
@@ -6,4 +5,5 @@ DROP TABLE IF EXISTS videos;
 DROP TABLE IF EXISTS masterclasses;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS children;
+DROP TABLE IF EXISTS families;
 DROP TYPE IF EXISTS parent_role;
