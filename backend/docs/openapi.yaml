@@ -22,6 +22,8 @@ tags:
     description: Invite-code generation and lookup for linking a partner
   - name: videos
     description: Video engagement (likes, watch progress) shared within a family
+  - name: masterclasses
+    description: Masterclass listings and per-family watch progress
 
 paths:
   /hello:
@@ -433,6 +435,113 @@ paths:
                 error: something went wrong
                 code: internal_error
 
+  /masterclasses:
+    get:
+      tags: [masterclasses]
+      summary: List masterclasses with family progress
+      description: >
+        Returns every masterclass with each family member's watch progress
+        (`GetMasterclassProgressForFamily`). Each progress entry is tagged
+        `isYou` so the caller's own row can be distinguished from the
+        partner's.
+      operationId: listMasterclasses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All masterclasses with per-family-member progress.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MasterclassSummary"
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing:
+                  value: { error: missing or malformed authorization header, code: unauthorized }
+                invalid:
+                  value: { error: invalid or expired token, code: invalid_token }
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+  /masterclasses/{id}:
+    get:
+      tags: [masterclasses]
+      summary: Get a masterclass and its videos with family activity
+      description: >
+        Returns a masterclass's videos, each with one entry per family
+        member (self and partner) for like state and watch progress on
+        that video.
+      operationId: getMasterclass
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Masterclass id.
+      responses:
+        "200":
+          description: Masterclass detail with per-video family activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MasterclassDetailResponse"
+        "400":
+          description: Malformed masterclass id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invalid masterclass id
+                code: invalid_request
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing:
+                  value: { error: missing or malformed authorization header, code: unauthorized }
+                invalid:
+                  value: { error: invalid or expired token, code: invalid_token }
+        "404":
+          description: Masterclass does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: masterclass not found
+                code: masterclass_not_found
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
 components:
   securitySchemes:
     bearerAuth:
@@ -618,3 +727,95 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FamilyMemberActivity"
+
+    MasterclassProgress:
+      type: object
+      required: [userId, role, isYou, completedVideos, totalVideos, percentComplete]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/ParentRole"
+        isYou:
+          type: boolean
+        completedVideos:
+          type: integer
+        totalVideos:
+          type: integer
+        percentComplete:
+          type: integer
+
+    MasterclassSummary:
+      type: object
+      required: [id, title, totalVideos, progress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        totalVideos:
+          type: integer
+        progress:
+          type: array
+          items:
+            $ref: "#/components/schemas/MasterclassProgress"
+
+    VideoMemberActivity:
+      type: object
+      required: [userId, role, isYou, liked, watchedSeconds]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/ParentRole"
+        isYou:
+          type: boolean
+        liked:
+          type: boolean
+        watchedSeconds:
+          type: integer
+        lastWatchedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    VideoWithActivity:
+      type: object
+      required: [id, title, durationSeconds, videoUrl, members]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        durationSeconds:
+          type: integer
+        videoUrl:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoMemberActivity"
+
+    MasterclassDetailResponse:
+      type: object
+      required: [id, title, videos]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoWithActivity"

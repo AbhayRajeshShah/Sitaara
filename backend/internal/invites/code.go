@@ -7,7 +7,7 @@ import (
 
 // Excludes 0/O and 1/I/L to avoid characters that are easy to misread.
 const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-const codeLength = 8
+const codeLength = 6
 
 func generateCode() (string, error) {
 	b := make([]byte, codeLength)

@@ -15,6 +15,7 @@ import (
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/db/sqlc"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/httpx"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/invites"
+	"github.com/AbhayRajeshShah/Sitaara/backend/internal/masterclasses"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/users"
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/videos"
 	"github.com/AbhayRajeshShah/Sitaara/backend/migrations"
@@ -45,6 +46,7 @@ func main() {
 	authHandler := auth.NewHandler(auth.NewService(queries, issuer))
 	videosHandler := videos.NewHandler(videos.NewService(queries))
 	invitesHandler := invites.NewHandler(invites.NewService(pool, queries))
+	masterclassesHandler := masterclasses.NewHandler(masterclasses.NewService(queries))
 
 	r := chi.NewRouter()
 	r.Get("/hello", helloHandler)
@@ -58,6 +60,8 @@ func main() {
 		r.Get("/me", usersHandler.Me)
 		r.Post("/invite-codes", invitesHandler.Generate)
 		r.Get("/invite-codes/active", invitesHandler.GetActive)
+		r.Get("/masterclasses", masterclassesHandler.List)
+		r.Get("/masterclasses/{id}", masterclassesHandler.GetDetail)
 	})
 
 	srv := &http.Server{
