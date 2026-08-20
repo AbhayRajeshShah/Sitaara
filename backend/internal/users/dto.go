@@ -31,3 +31,11 @@ type CreateUserResponse struct {
 	Token          string          `json:"token"`
 	TokenExpiresAt time.Time       `json:"tokenExpiresAt"`
 }
+
+type MeResponse struct {
+	ID        pgtype.UUID        `json:"id"`
+	Email     string             `json:"email"`
+	Role      sqlc.ParentRole    `json:"role"`
+	FamilyID  pgtype.UUID        `json:"familyId"`
+	CreatedAt pgtype.Timestamptz `json:"createdAt"`
+}

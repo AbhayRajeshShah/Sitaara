@@ -173,3 +173,13 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (createResu
 
 	return createResult{User: newUser, Child: newChild, Token: token, TokenExpiresAt: expiresAt}, nil
 }
+
+func (s *Service) GetByID(ctx context.Context, id pgtype.UUID) (sqlc.User, *apiError) {
+	user, err := s.queries.GetUserByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.User{}, notFound("user_not_found", "user not found")
+	} else if err != nil {
+		return sqlc.User{}, internalErr(err)
+	}
+	return user, nil
+}

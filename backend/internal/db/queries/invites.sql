@@ -19,3 +19,13 @@ SET redeemed_by_user_id = $2,
 WHERE id = $1
   AND redeemed_by_user_id IS NULL
 RETURNING *;
+
+-- name: DeleteActiveInvitesForFamily :exec
+DELETE FROM invite_codes
+WHERE family_id = $1 AND redeemed_by_user_id IS NULL;
+
+-- name: GetActiveInviteForFamily :one
+SELECT * FROM invite_codes
+WHERE family_id = $1 AND redeemed_by_user_id IS NULL
+ORDER BY created_at DESC
+LIMIT 1;

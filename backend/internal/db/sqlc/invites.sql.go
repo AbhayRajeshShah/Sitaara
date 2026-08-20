@@ -38,6 +38,38 @@ func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (Inv
 	return i, err
 }
 
+const deleteActiveInvitesForFamily = `-- name: DeleteActiveInvitesForFamily :exec
+DELETE FROM invite_codes
+WHERE family_id = $1 AND redeemed_by_user_id IS NULL
+`
+
+func (q *Queries) DeleteActiveInvitesForFamily(ctx context.Context, familyID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteActiveInvitesForFamily, familyID)
+	return err
+}
+
+const getActiveInviteForFamily = `-- name: GetActiveInviteForFamily :one
+SELECT id, code, generated_by_user_id, redeemed_by_user_id, family_id, created_at, redeemed_at FROM invite_codes
+WHERE family_id = $1 AND redeemed_by_user_id IS NULL
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetActiveInviteForFamily(ctx context.Context, familyID pgtype.UUID) (InviteCode, error) {
+	row := q.db.QueryRow(ctx, getActiveInviteForFamily, familyID)
+	var i InviteCode
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.GeneratedByUserID,
+		&i.RedeemedByUserID,
+		&i.FamilyID,
+		&i.CreatedAt,
+		&i.RedeemedAt,
+	)
+	return i, err
+}
+
 const getInviteByCode = `-- name: GetInviteByCode :one
 SELECT id, code, generated_by_user_id, redeemed_by_user_id, family_id, created_at, redeemed_at FROM invite_codes
 WHERE code = $1
