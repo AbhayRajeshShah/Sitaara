@@ -15,6 +15,7 @@ class PrimaryButton extends StatelessWidget {
     this.borderRadius = 12,
     this.enabled = true,
     this.boldLabel = false,
+    this.loading = false,
   });
 
   final String label;
@@ -24,18 +25,20 @@ class PrimaryButton extends StatelessWidget {
   final double borderRadius;
   final bool enabled;
   final bool boldLabel;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final textStyle = boldLabel ? AppTypography.buttonBold : AppTypography.button;
+    final active = enabled && !loading;
     return Opacity(
-      opacity: enabled ? 1 : 0.5,
+      opacity: active ? 1 : 0.5,
       child: Material(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(borderRadius),
         child: InkWell(
           borderRadius: BorderRadius.circular(borderRadius),
-          onTap: enabled ? onPressed : null,
+          onTap: active ? onPressed : null,
           child: Container(
             height: 56,
             alignment: Alignment.center,
@@ -45,7 +48,14 @@ class PrimaryButton extends StatelessWidget {
               children: [
                 Text(label, style: textStyle),
                 const SizedBox(width: 8),
-                Icon(icon, size: 14, color: textStyle.color),
+                if (loading)
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: textStyle.color),
+                  )
+                else
+                  Icon(icon, size: 14, color: textStyle.color),
               ],
             ),
           ),

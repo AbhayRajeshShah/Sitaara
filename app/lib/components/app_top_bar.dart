@@ -13,6 +13,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.onLeadingTap,
     this.showAvatar = false,
     this.titleFontSize = 20,
+    this.onAvatarTap,
   });
 
   final String title;
@@ -20,6 +21,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onLeadingTap;
   final bool showAvatar;
   final double titleFontSize;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -51,15 +53,19 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             if (showAvatar)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.lightPurpleBg, width: 2),
-                    color: AppColors.iconCircleBg,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(9999),
+                  onTap: onAvatarTap,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.lightPurpleBg, width: 2),
+                      color: AppColors.iconCircleBg,
+                    ),
+                    child: const Icon(Icons.person, color: AppColors.primary, size: 20),
                   ),
-                  child: const Icon(Icons.person, color: AppColors.primary, size: 20),
                 ),
               )
             else

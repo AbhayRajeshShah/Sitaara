@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../components/primary_button.dart';
+import '../../models/parent_role.dart';
+import '../../models/sign_up_draft.dart';
+import '../../services/api_client.dart';
+import '../../services/app_services.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
-
-enum ParentRole { father, mother, guardian }
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -15,9 +18,53 @@ class RoleSelectionScreen extends StatefulWidget {
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   ParentRole? _selectedRole;
+  bool _loading = false;
 
-  void _continue() {
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+  SignUpDraft _draftFromArgs(BuildContext context) {
+    final args = ModalRoute.of(context)!.settings.arguments;
+    if (args is SignUpDraft) return args;
+    return const SignUpDraft(email: '', password: '');
+  }
+
+  Future<void> _continue(BuildContext context) async {
+    final role = _selectedRole;
+    if (role == null) return;
+
+    final draft = _draftFromArgs(context).withRole(role);
+    print(
+      (
+        email: draft.email,
+        password: draft.password,
+        role: role,
+        inviteCode: draft.inviteCode,
+        childName: draft.childName,
+        childDob: draft.childDob,
+      ).toString(),
+    );
+    setState(() => _loading = true);
+    try {
+      await AppServices.auth.signUp(
+        email: draft.email,
+        password: draft.password,
+        role: role,
+        inviteCode: draft.inviteCode,
+        childName: draft.childName,
+        childDob: draft.childDob,
+      );
+      print('signUp successful');
+      if (!context.mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyAuthError(e)),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -29,7 +76,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Column(
             children: [
-              const Icon(Icons.auto_awesome_rounded, size: 44, color: AppColors.deepPurple),
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 44,
+                color: AppColors.deepPurple,
+              ),
               const SizedBox(height: 8),
               Text(
                 "What's your\nsuperpower?",
@@ -45,30 +96,32 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               const SizedBox(height: 32),
               _RoleCard(
                 icon: Icons.face_rounded,
-                label: 'Father',
-                selected: _selectedRole == ParentRole.father,
-                onTap: () => setState(() => _selectedRole = ParentRole.father),
+                label: ParentRole.dad.label,
+                selected: _selectedRole == ParentRole.dad,
+                onTap: () => setState(() => _selectedRole = ParentRole.dad),
               ),
               const SizedBox(height: 16),
               _RoleCard(
                 icon: Icons.face_3_rounded,
-                label: 'Mother',
-                selected: _selectedRole == ParentRole.mother,
-                onTap: () => setState(() => _selectedRole = ParentRole.mother),
+                label: ParentRole.mom.label,
+                selected: _selectedRole == ParentRole.mom,
+                onTap: () => setState(() => _selectedRole = ParentRole.mom),
               ),
               const SizedBox(height: 16),
               _RoleCard(
                 icon: Icons.family_restroom_rounded,
-                label: 'Guardian',
+                label: ParentRole.guardian.label,
                 selected: _selectedRole == ParentRole.guardian,
-                onTap: () => setState(() => _selectedRole = ParentRole.guardian),
+                onTap: () =>
+                    setState(() => _selectedRole = ParentRole.guardian),
               ),
               const SizedBox(height: 32),
               PrimaryButton(
                 label: 'Continue',
-                onPressed: _continue,
-                backgroundColor: const Color(0xFFE1E3E4),
+                onPressed: () => _continue(context),
+                backgroundColor: AppColors.primary,
                 enabled: _selectedRole != null,
+                loading: _loading,
               ),
             ],
           ),

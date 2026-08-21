@@ -6,6 +6,7 @@ import '../../components/dual_progress_bar.dart';
 import '../../components/image_placeholder.dart';
 import '../../components/masterclass_card.dart';
 import '../../components/section_heading.dart';
+import '../../services/app_services.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 
@@ -16,6 +17,27 @@ class HomeDashboardScreen extends StatelessWidget {
     Navigator.of(context).pushNamed('/lesson-player');
   }
 
+  Future<void> _showAccountMenu(BuildContext context) async {
+    final signOut = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppServices.auth.currentSession?.email ?? 'Account'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (signOut == true) {
+      await AppServices.auth.signOut();
+      if (!context.mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,6 +46,7 @@ class HomeDashboardScreen extends StatelessWidget {
         title: 'Parenting Masterclass',
         leadingIcon: Icons.menu,
         showAvatar: true,
+        onAvatarTap: () => _showAccountMenu(context),
       ),
       bottomNavigationBar: AppBottomNavBar(activeTab: AppNavTab.home),
       body: SingleChildScrollView(

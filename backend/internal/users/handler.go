@@ -1,6 +1,7 @@
 package users
 
 import (
+	"fmt"
 	"encoding/json"
 	"net/http"
 
@@ -49,6 +50,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Hello, world!")
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing authentication")

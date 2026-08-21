@@ -2,14 +2,82 @@ import 'package:flutter/material.dart';
 
 import '../../components/app_text_field.dart';
 import '../../components/primary_button.dart';
+import '../../models/sign_up_draft.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
 
-class ChildDetailsScreen extends StatelessWidget {
+class ChildDetailsScreen extends StatefulWidget {
   const ChildDetailsScreen({super.key});
 
-  void _continue(BuildContext context) {
-    Navigator.of(context).pushNamed('/role-selection');
+  @override
+  State<ChildDetailsScreen> createState() => _ChildDetailsScreenState();
+}
+
+class _ChildDetailsScreenState extends State<ChildDetailsScreen> {
+  final _childNameController = TextEditingController();
+  final _inviteCodeController = TextEditingController();
+  final _dobDisplayController = TextEditingController();
+
+  DateTime? _childDob;
+  String? _childNameError;
+  String? _dobError;
+  String? _inviteCodeError;
+
+  @override
+  void dispose() {
+    _childNameController.dispose();
+    _inviteCodeController.dispose();
+    _dobDisplayController.dispose();
+    super.dispose();
+  }
+
+  SignUpDraft _draftFromArgs(BuildContext context) {
+    final args = ModalRoute.of(context)!.settings.arguments;
+    if (args is SignUpDraft) return args;
+    return const SignUpDraft(email: '', password: '');
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _childDob ?? DateTime(now.year - 1, now.month, now.day),
+      firstDate: DateTime(now.year - 20),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        _childDob = picked;
+        _dobDisplayController.text =
+            '${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}';
+        _dobError = null;
+      });
+    }
+  }
+
+  void _continueWithNewChild(BuildContext context) {
+    setState(() {
+      _childNameError = _childNameController.text.trim().isEmpty ? "Enter your child's name" : null;
+      _dobError = _childDob == null ? 'Select a date of birth' : null;
+    });
+    if (_childNameError != null || _dobError != null) return;
+
+    final dob = _childDob!;
+    final iso =
+        '${dob.year.toString().padLeft(4, '0')}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+    final draft = _draftFromArgs(
+      context,
+    ).withNewChild(childName: _childNameController.text.trim(), childDob: iso);
+    Navigator.of(context).pushNamed('/role-selection', arguments: draft);
+  }
+
+  void _joinWithInviteCode(BuildContext context) {
+    final code = _inviteCodeController.text.trim();
+    setState(() => _inviteCodeError = code.isEmpty ? 'Enter an invite code' : null);
+    if (_inviteCodeError != null) return;
+
+    final draft = _draftFromArgs(context).withInviteCode(code);
+    Navigator.of(context).pushNamed('/role-selection', arguments: draft);
   }
 
   @override
@@ -88,6 +156,9 @@ class ChildDetailsScreen extends StatelessWidget {
                         label: "Child's Name",
                         hint: 'e.g. Leo',
                         borderRadius: 8,
+                        controller: _childNameController,
+                        textInputAction: TextInputAction.next,
+                        errorText: _childNameError,
                       ),
                       const SizedBox(height: 16),
                       AppTextField(
@@ -95,11 +166,16 @@ class ChildDetailsScreen extends StatelessWidget {
                         hint: 'mm/dd/yyyy',
                         trailingIcon: Icons.calendar_today_outlined,
                         borderRadius: 8,
+                        readOnly: true,
+                        onTap: _pickDob,
+                        onTrailingIconTap: _pickDob,
+                        errorText: _dobError,
+                        controller: _dobDisplayController,
                       ),
                       const SizedBox(height: 16),
                       PrimaryButton(
                         label: 'Continue',
-                        onPressed: () => _continue(context),
+                        onPressed: () => _continueWithNewChild(context),
                         backgroundColor: AppColors.deepPurple,
                         borderRadius: 16,
                         boldLabel: true,
@@ -135,19 +211,38 @@ class ChildDetailsScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Container(
+                            child: SizedBox(
                               height: 50,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: AppColors.inputBg,
-                                border: Border.all(color: AppColors.border),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'HAVE A CODE?',
+                              child: TextField(
+                                controller: _inviteCodeController,
+                                textAlign: TextAlign.center,
+                                textCapitalization: TextCapitalization.characters,
                                 style: AppTypography.body.copyWith(
-                                  color: AppColors.placeholderText,
+                                  color: AppColors.headingText,
                                   letterSpacing: 1.6,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'HAVE A CODE?',
+                                  hintStyle: AppTypography.body.copyWith(
+                                    color: AppColors.placeholderText,
+                                    letterSpacing: 1.6,
+                                  ),
+                                  errorText: _inviteCodeError,
+                                  filled: true,
+                                  fillColor: AppColors.inputBg,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 17),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                                  ),
                                 ),
                               ),
                             ),
@@ -158,7 +253,7 @@ class ChildDetailsScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(8),
-                              onTap: () => _continue(context),
+                              onTap: () => _joinWithInviteCode(context),
                               child: Container(
                                 height: 50,
                                 padding: const EdgeInsets.symmetric(horizontal: 25),

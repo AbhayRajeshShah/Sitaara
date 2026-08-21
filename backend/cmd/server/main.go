@@ -20,6 +20,7 @@ import (
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/videos"
 	"github.com/AbhayRajeshShah/Sitaara/backend/migrations"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,6 +50,16 @@ func main() {
 	masterclassesHandler := masterclasses.NewHandler(masterclasses.NewService(queries))
 
 	r := chi.NewRouter()
+	// Permissive dev CORS: the API is bearer-token authenticated (no cookies),
+	// so a wildcard origin with AllowCredentials:false is safe here. Tighten
+	// AllowedOrigins for a real deployment.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 	r.Get("/hello", helloHandler)
 	r.Get("/health", healthHandler(pool))
 	r.Post("/users", usersHandler.Create)

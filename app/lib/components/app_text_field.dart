@@ -16,6 +16,14 @@ class AppTextField extends StatelessWidget {
     this.obscureText = false,
     this.borderRadius = 12,
     this.textAlign = TextAlign.start,
+    this.controller,
+    this.keyboardType,
+    this.textInputAction,
+    this.errorText,
+    this.onChanged,
+    this.readOnly = false,
+    this.onTap,
+    this.enabled = true,
   });
 
   final String label;
@@ -26,6 +34,14 @@ class AppTextField extends StatelessWidget {
   final bool obscureText;
   final double borderRadius;
   final TextAlign textAlign;
+  final TextEditingController? controller;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +53,20 @@ class AppTextField extends StatelessWidget {
           child: Text(label, style: AppTypography.labelSmall),
         ),
         TextField(
+          controller: controller,
           obscureText: obscureText,
           textAlign: textAlign,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          onChanged: onChanged,
+          readOnly: readOnly,
+          onTap: onTap,
+          enabled: enabled,
           style: AppTypography.body.copyWith(color: AppColors.headingText),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: AppTypography.body.copyWith(color: AppColors.placeholderText),
+            errorText: errorText,
             filled: true,
             fillColor: AppColors.inputBg,
             prefixIcon: leadingIcon != null

@@ -39,16 +39,21 @@ class LessonPlayerScreen extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.bookmark_border_rounded, color: AppColors.deepPurple),
+                    icon: const Icon(
+                      Icons.favorite,
+                      color: AppColors.deepPurple,
+                    ),
                     onPressed: () {},
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              Text(
-                "Learn the foundational steps to recognizing and validating your child's big feelings, "
-                'creating a secure base for emotional growth.',
-                style: AppTypography.body,
+              Row(
+                children: [
+                  Icon(Icons.favorite, color: AppColors.deepPurple),
+                  SizedBox(width: 4),
+                  Text('Liked By Mom', style: AppTypography.label),
+                ],
               ),
               const SizedBox(height: 24),
               const Divider(color: AppColors.neutralBorder),
@@ -101,7 +106,11 @@ class _VideoPlayer extends StatelessWidget {
           color: Colors.black,
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
-            BoxShadow(color: Colors.black26, blurRadius: 15, offset: Offset(0, 10)),
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 15,
+              offset: Offset(0, 10),
+            ),
           ],
         ),
         clipBehavior: Clip.antiAlias,
@@ -110,7 +119,10 @@ class _VideoPlayer extends StatelessWidget {
           children: [
             Opacity(
               opacity: 0.8,
-              child: ImagePlaceholder(icon: Icons.family_restroom_rounded, iconSize: 40),
+              child: ImagePlaceholder(
+                icon: Icons.family_restroom_rounded,
+                iconSize: 40,
+              ),
             ),
             Center(
               child: Container(
@@ -119,9 +131,15 @@ class _VideoPlayer extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.4),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                 ),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
             ),
             Positioned(
@@ -134,7 +152,10 @@ class _VideoPlayer extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withValues(alpha: 0.8), Colors.black.withValues(alpha: 0)],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.8),
+                      Colors.black.withValues(alpha: 0),
+                    ],
                   ),
                 ),
                 child: Column(
@@ -146,15 +167,23 @@ class _VideoPlayer extends StatelessWidget {
                         value: 0.33,
                         minHeight: 6,
                         backgroundColor: Colors.white.withValues(alpha: 0.3),
-                        valueColor: const AlwaysStoppedAnimation(AppColors.lightPurpleBg),
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.lightPurpleBg,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: const [
-                        Text('04:12', style: TextStyle(color: Colors.white, fontSize: 12)),
-                        Text('12:45', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        Text(
+                          '04:12',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                        Text(
+                          '12:45',
+                          style: TextStyle(color: Colors.white, fontSize: 12),
+                        ),
                       ],
                     ),
                   ],
@@ -171,7 +200,11 @@ class _VideoPlayer extends StatelessWidget {
 enum _ItemStatus { playing, completed, upcoming }
 
 class _CourseItem extends StatelessWidget {
-  const _CourseItem({required this.title, required this.duration, required this.status});
+  const _CourseItem({
+    required this.title,
+    required this.duration,
+    required this.status,
+  });
 
   final String title;
   final String duration;
@@ -184,7 +217,9 @@ class _CourseItem extends StatelessWidget {
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: active ? AppColors.activeItemBg : AppColors.pageBg,
-        border: Border.all(color: active ? AppColors.activeItemBorder : Colors.transparent),
+        border: Border.all(
+          color: active ? AppColors.activeItemBorder : Colors.transparent,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -202,9 +237,17 @@ class _CourseItem extends StatelessWidget {
                 ),
               ),
               if (status == _ItemStatus.upcoming)
-                const Icon(Icons.lock_outline_rounded, color: Colors.white, size: 18),
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               if (active)
-                const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
             ],
           ),
           const SizedBox(width: 16),
@@ -215,7 +258,10 @@ class _CourseItem extends StatelessWidget {
                 if (active)
                   Container(
                     margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(4),
@@ -232,7 +278,10 @@ class _CourseItem extends StatelessWidget {
                 Text(
                   title,
                   style: active
-                      ? AppTypography.label.copyWith(color: AppColors.deepPurple, fontWeight: FontWeight.w700)
+                      ? AppTypography.label.copyWith(
+                          color: AppColors.deepPurple,
+                          fontWeight: FontWeight.w700,
+                        )
                       : AppTypography.label,
                 ),
                 const SizedBox(height: 4),
@@ -242,8 +291,8 @@ class _CourseItem extends StatelessWidget {
                       status == _ItemStatus.completed
                           ? Icons.check_circle_rounded
                           : status == _ItemStatus.upcoming
-                              ? Icons.lock_outline_rounded
-                              : Icons.access_time_rounded,
+                          ? Icons.lock_outline_rounded
+                          : Icons.access_time_rounded,
                       size: 12,
                       color: status == _ItemStatus.completed
                           ? AppColors.completedGreen
@@ -254,14 +303,14 @@ class _CourseItem extends StatelessWidget {
                       status == _ItemStatus.completed
                           ? 'Completed'
                           : status == _ItemStatus.upcoming
-                              ? 'Up next'
-                              : duration,
+                          ? 'Up next'
+                          : duration,
                       style: AppTypography.labelSmall.copyWith(
                         color: status == _ItemStatus.completed
                             ? AppColors.completedGreen
                             : status == _ItemStatus.playing
-                                ? const Color(0xCC30127A)
-                                : AppColors.bodyText,
+                            ? const Color(0xCC30127A)
+                            : AppColors.bodyText,
                       ),
                     ),
                   ],

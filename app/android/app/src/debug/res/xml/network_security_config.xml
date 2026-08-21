@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Debug-only: allow cleartext HTTP everywhere (dev backend may be
+         localhost, 10.0.2.2, or a LAN IP that changes with DHCP). Release
+         builds have no override and stay locked to HTTPS. -->
+    <base-config cleartextTrafficPermitted="true"/>
+</network-security-config>
