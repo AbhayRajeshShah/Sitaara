@@ -11,12 +11,15 @@ class ApiConfig {
   /// needs `adb reverse tcp:8080 tcp:8080` and must hit `localhost` (not
   /// `10.0.2.2`, which is meaningless outside the emulator) — pass
   /// `--dart-define=API_HOST=localhost` when running on real hardware.
-  static const String _androidHost = String.fromEnvironment('API_HOST', defaultValue: '10.0.2.2');
+  static const String _apiHost = String.fromEnvironment(
+    'API_HOST',
+    defaultValue: 'http://localhost:8080',
+  );
 
   static String get baseUrl {
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://$_androidHost:8080';
+      return _apiHost;
     }
-    return 'http://localhost:8080';
+    return _apiHost;
   }
 }
