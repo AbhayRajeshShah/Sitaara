@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../components/app_bottom_nav_bar.dart';
@@ -70,6 +72,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
 
   int _selectedIndex = 0;
   VideoPlayerController? _controller;
+  ChewieController? _chewieController;
   String? _videoError;
 
   Timer? _progressTimer;
@@ -135,6 +138,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
     final video = detail.videos[index];
 
     final oldController = _controller;
+    final oldChewieController = _chewieController;
     if (oldController != null && oldController.value.isInitialized) {
       await _flushProgress();
     }
@@ -144,8 +148,10 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
     setState(() {
       _selectedIndex = index;
       _controller = null;
+      _chewieController = null;
       _videoError = null;
     });
+    oldChewieController?.dispose();
     await oldController?.dispose();
 
     final controller = VideoPlayerController.networkUrl(Uri.parse(video.videoUrl));
@@ -163,7 +169,26 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
         await controller.dispose();
         return;
       }
-      setState(() => _controller = controller);
+      final chewieController = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: false,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: AppColors.lightPurpleBg,
+          handleColor: AppColors.lightPurpleBg,
+          bufferedColor: Colors.white.withValues(alpha: 0.3),
+          backgroundColor: Colors.white.withValues(alpha: 0.2),
+        ),
+        deviceOrientationsOnEnterFullScreen: const [
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ],
+        deviceOrientationsAfterFullScreen: const [DeviceOrientation.portraitUp],
+        systemOverlaysAfterFullScreen: SystemUiOverlay.values,
+      );
+      setState(() {
+        _controller = controller;
+        _chewieController = chewieController;
+      });
       _progressFlushedForCurrentVideo = false;
       _progressTimer = Timer.periodic(_progressTickInterval, (_) {
         if (_controller?.value.isPlaying ?? false) unawaited(_flushProgress());
@@ -269,6 +294,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
     WidgetsBinding.instance.removeObserver(this);
     _progressTimer?.cancel();
     unawaited(_flushProgress());
+    _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -325,6 +351,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
       children: [
         _VideoPlayer(
           controller: _controller,
+          chewieController: _chewieController,
           videoError: _videoError,
           onRetry: () => _selectVideo(_selectedIndex, autoplay: false),
         ),
@@ -398,15 +425,22 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _VideoPlayer extends StatelessWidget {
-  const _VideoPlayer({required this.controller, required this.videoError, required this.onRetry});
+  const _VideoPlayer({
+    required this.controller,
+    required this.chewieController,
+    required this.videoError,
+    required this.onRetry,
+  });
 
   final VideoPlayerController? controller;
+  final ChewieController? chewieController;
   final String? videoError;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     final controller = this.controller;
+    final chewieController = this.chewieController;
     return AspectRatio(
       aspectRatio: controller != null && controller.value.isInitialized
           ? controller.value.aspectRatio
@@ -420,9 +454,9 @@ class _VideoPlayer extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: videoError != null
             ? _VideoErrorState(message: videoError!, onRetry: onRetry)
-            : controller == null
+            : (controller == null || chewieController == null)
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
-            : _VideoPlayerContent(controller: controller),
+            : Chewie(controller: chewieController),
       ),
     );
   }
@@ -450,94 +484,6 @@ class _VideoErrorState extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _VideoPlayerContent extends StatelessWidget {
-  const _VideoPlayerContent({required this.controller});
-
-  final VideoPlayerController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<VideoPlayerValue>(
-      valueListenable: controller,
-      builder: (context, value, _) {
-        final position = value.position;
-        final duration = value.duration;
-        final progress = duration.inMilliseconds == 0
-            ? 0.0
-            : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
-        return GestureDetector(
-          onTap: () => value.isPlaying ? controller.pause() : controller.play(),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              VideoPlayer(controller),
-              Center(
-                child: AnimatedOpacity(
-                  opacity: value.isPlaying ? 0 : 1,
-                  duration: const Duration(milliseconds: 150),
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                    ),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Colors.black.withValues(alpha: 0.8), Colors.black.withValues(alpha: 0)],
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(9999),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 6,
-                          backgroundColor: Colors.white.withValues(alpha: 0.3),
-                          valueColor: const AlwaysStoppedAnimation(AppColors.lightPurpleBg),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(position),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                          Text(
-                            _formatDuration(duration),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
