@@ -68,6 +68,9 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(issuer.RequireAuth)
 		r.Get("/videos/{id}/partner-activity", videosHandler.GetFamilyActivity)
+		r.Post("/videos/{id}/like", videosHandler.ToggleLike)
+		r.Post("/videos/{id}/progress", videosHandler.UpdateProgress)
+		r.Get("/videos/{id}/progress", videosHandler.GetProgress)
 		r.Get("/me", usersHandler.Me)
 		r.Post("/invite-codes", invitesHandler.Generate)
 		r.Get("/invite-codes/active", invitesHandler.GetActive)

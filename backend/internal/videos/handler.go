@@ -1,6 +1,7 @@
 package videos
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/AbhayRajeshShah/Sitaara/backend/internal/auth"
@@ -31,6 +32,75 @@ func (h *Handler) GetFamilyActivity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, aerr := h.svc.GetFamilyActivity(r.Context(), userID, videoID)
+	if aerr != nil {
+		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing authentication")
+		return
+	}
+
+	videoID, err := db.ParseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", "invalid video id")
+		return
+	}
+
+	resp, aerr := h.svc.ToggleLike(r.Context(), userID, videoID)
+	if aerr != nil {
+		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing authentication")
+		return
+	}
+
+	videoID, err := db.ParseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", "invalid video id")
+		return
+	}
+
+	var req UpdateProgressRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
+		return
+	}
+
+	resp, aerr := h.svc.UpdateProgress(r.Context(), userID, videoID, req.WatchedSeconds)
+	if aerr != nil {
+		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) GetProgress(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing authentication")
+		return
+	}
+
+	videoID, err := db.ParseUUID(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_request", "invalid video id")
+		return
+	}
+
+	resp, aerr := h.svc.GetProgress(r.Context(), userID, videoID)
 	if aerr != nil {
 		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
 		return

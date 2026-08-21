@@ -18,3 +18,18 @@ type FamilyActivityResponse struct {
 	VideoID pgtype.UUID             `json:"videoId"`
 	Members []FamilyMemberActivity  `json:"members"`
 }
+
+type LikeResponse struct {
+	VideoID pgtype.UUID `json:"videoId"`
+	Liked   bool        `json:"liked"`
+}
+
+type UpdateProgressRequest struct {
+	WatchedSeconds int32 `json:"watchedSeconds"`
+}
+
+type ProgressResponse struct {
+	VideoID        pgtype.UUID        `json:"videoId"`
+	WatchedSeconds int32              `json:"watchedSeconds"`
+	LastUpdatedAt  pgtype.Timestamptz `json:"lastUpdatedAt"`
+}

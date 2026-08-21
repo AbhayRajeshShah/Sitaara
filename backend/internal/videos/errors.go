@@ -13,6 +13,8 @@ type apiError struct {
 
 func notFound(code, msg string) *apiError { return &apiError{http.StatusNotFound, code, msg} }
 
+func badRequest(code, msg string) *apiError { return &apiError{http.StatusBadRequest, code, msg} }
+
 func internalErr(err error) *apiError {
 	log.Printf("videos: internal error: %v", err)
 	return &apiError{http.StatusInternalServerError, "internal_error", "something went wrong"}

@@ -435,6 +435,212 @@ paths:
                 error: something went wrong
                 code: internal_error
 
+  /videos/{id}/like:
+    post:
+      tags: [videos]
+      summary: Toggle like state for a video
+      description: >
+        Likes the video for the caller if not already liked, or unlikes it
+        if already liked (`LikeVideo`/`UnlikeVideo`, keyed off `GetLike`).
+        Idempotent by construction — repeated calls simply keep flipping the
+        state, and a duplicate like never creates a duplicate row.
+      operationId: toggleVideoLike
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Video id.
+      responses:
+        "200":
+          description: Like state after this call.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+        "400":
+          description: Malformed video id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invalid video id
+                code: invalid_request
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing:
+                  value: { error: missing or malformed authorization header, code: unauthorized }
+                invalid:
+                  value: { error: invalid or expired token, code: invalid_token }
+        "404":
+          description: Video does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: video not found
+                code: video_not_found
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+  /videos/{id}/progress:
+    post:
+      tags: [videos]
+      summary: Report watch progress for a video
+      description: >
+        Upserts the caller's watch progress (`UpsertWatchProgress`). The
+        furthest-watched position always wins — submitting a smaller value
+        than what's already stored is a no-op, and a value beyond the
+        video's duration is clamped to the duration.
+      operationId: updateVideoProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Video id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProgressRequest"
+      responses:
+        "200":
+          description: Watch progress after this call.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressResponse"
+        "400":
+          description: Malformed video id, malformed JSON body, or negative watchedSeconds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                invalidId:
+                  value: { error: invalid video id, code: invalid_request }
+                malformedBody:
+                  value: { error: malformed JSON body, code: invalid_request }
+                negative:
+                  value: { error: watchedSeconds must be non-negative, code: invalid_request }
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing:
+                  value: { error: missing or malformed authorization header, code: unauthorized }
+                invalid:
+                  value: { error: invalid or expired token, code: invalid_token }
+        "404":
+          description: Video does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: video not found
+                code: video_not_found
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+    get:
+      tags: [videos]
+      summary: Get the caller's watch progress for a video
+      description: >
+        Returns the caller's own watch progress (`GetWatchProgress`). If the
+        caller has never reported progress for this video, returns
+        `watchedSeconds: 0` with a null `lastUpdatedAt` rather than 404ing.
+      operationId: getVideoProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Video id.
+      responses:
+        "200":
+          description: The caller's watch progress for this video.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressResponse"
+        "400":
+          description: Malformed video id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invalid video id
+                code: invalid_request
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                missing:
+                  value: { error: missing or malformed authorization header, code: unauthorized }
+                invalid:
+                  value: { error: invalid or expired token, code: invalid_token }
+        "404":
+          description: Video does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: video not found
+                code: video_not_found
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
   /masterclasses:
     get:
       tags: [masterclasses]
@@ -727,6 +933,44 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FamilyMemberActivity"
+
+    LikeResponse:
+      type: object
+      required: [videoId, liked]
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        liked:
+          type: boolean
+          description: The like state after this call (true if now liked, false if now unliked).
+
+    UpdateProgressRequest:
+      type: object
+      required: [watchedSeconds]
+      properties:
+        watchedSeconds:
+          type: integer
+          minimum: 0
+          description: Current playback position in seconds. Clamped server-side to the video's duration.
+
+    ProgressResponse:
+      type: object
+      required: [videoId, watchedSeconds]
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        watchedSeconds:
+          type: integer
+          description: >
+            Furthest position ever reported for this user/video (never
+            decreases, regardless of what was last submitted).
+        lastUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Null if the user has never reported progress for this video.
 
     MasterclassProgress:
       type: object
