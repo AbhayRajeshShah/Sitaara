@@ -285,7 +285,10 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
         onLeadingTap: () => Navigator.of(context).maybePop(),
         showAvatar: true,
       ),
-      bottomNavigationBar: const AppBottomNavBar(activeTab: AppNavTab.classes),
+      bottomNavigationBar: AppBottomNavBar(
+        activeTab: AppNavTab.classes,
+        onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: ConstrainedBox(

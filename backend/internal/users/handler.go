@@ -1,7 +1,6 @@
 package users
 
 import (
-	"fmt"
 	"encoding/json"
 	"net/http"
 
@@ -50,7 +49,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Hello, world!")
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthorized", "missing authentication")
@@ -61,11 +59,21 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, MeResponse{
+	child, aerr := h.svc.GetChildForFamily(r.Context(), user.FamilyID)
+	if aerr != nil {
+		httpx.WriteError(w, aerr.status, aerr.code, aerr.message)
+		return
+	}
+
+	resp := MeResponse{
 		ID:        user.ID,
 		Email:     user.Email,
 		Role:      user.Role,
 		FamilyID:  user.FamilyID,
 		CreatedAt: user.CreatedAt,
-	})
+	}
+	if child != nil {
+		resp.Child = &ChildResponse{ID: child.ID, Name: child.Name, DateOfBirth: child.DateOfBirth}
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }

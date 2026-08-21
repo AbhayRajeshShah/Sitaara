@@ -183,3 +183,13 @@ func (s *Service) GetByID(ctx context.Context, id pgtype.UUID) (sqlc.User, *apiE
 	}
 	return user, nil
 }
+
+func (s *Service) GetChildForFamily(ctx context.Context, familyID pgtype.UUID) (*sqlc.Child, *apiError) {
+	child, err := s.queries.GetChildByFamilyID(ctx, familyID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, internalErr(err)
+	}
+	return &child, nil
+}

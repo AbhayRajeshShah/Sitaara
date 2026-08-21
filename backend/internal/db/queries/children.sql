@@ -6,3 +6,9 @@ RETURNING *;
 -- name: GetChild :one
 SELECT * FROM children
 WHERE id = $1;
+
+-- name: GetChildByFamilyID :one
+SELECT * FROM children
+WHERE family_id = $1
+ORDER BY created_at ASC
+LIMIT 1;

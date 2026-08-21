@@ -1,15 +1,19 @@
+import 'dart:async';
+
 import '../models/auth_session.dart';
 import '../models/parent_role.dart';
 import 'api_client.dart';
 import 'auth_storage.dart';
+import 'watch_progress_store.dart';
 
 /// Auth-specific endpoints on top of [ApiClient]/[AuthStorage]: sign in,
 /// sign up, session restore/sign-out, and a shared error-message mapping.
 class AuthService {
-  AuthService(this._client, this._storage);
+  AuthService(this._client, this._storage, this._watchProgress);
 
   final ApiClient _client;
   final AuthStorage _storage;
+  final WatchProgressStore _watchProgress;
 
   AuthSession? _currentSession;
   AuthSession? get currentSession => _currentSession;
@@ -54,12 +58,14 @@ class AuthService {
   Future<void> signOut() async {
     _currentSession = null;
     await _storage.clear();
+    await _watchProgress.clearAll();
   }
 
   /// Called by [ApiClient.onUnauthorized] when a stored token is dead.
   void handleUnauthorized() {
     _currentSession = null;
     _storage.clear();
+    unawaited(_watchProgress.clearAll());
   }
 }
 

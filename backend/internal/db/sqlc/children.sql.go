@@ -53,3 +53,23 @@ func (q *Queries) GetChild(ctx context.Context, id pgtype.UUID) (Child, error) {
 	)
 	return i, err
 }
+
+const getChildByFamilyID = `-- name: GetChildByFamilyID :one
+SELECT id, family_id, name, date_of_birth, created_at FROM children
+WHERE family_id = $1
+ORDER BY created_at ASC
+LIMIT 1
+`
+
+func (q *Queries) GetChildByFamilyID(ctx context.Context, familyID pgtype.UUID) (Child, error) {
+	row := q.db.QueryRow(ctx, getChildByFamilyID, familyID)
+	var i Child
+	err := row.Scan(
+		&i.ID,
+		&i.FamilyID,
+		&i.Name,
+		&i.DateOfBirth,
+		&i.CreatedAt,
+	)
+	return i, err
+}

@@ -5,6 +5,7 @@ import 'api_client.dart';
 import 'auth_service.dart';
 import 'auth_storage.dart';
 import 'masterclass_service.dart';
+import 'user_service.dart';
 import 'watch_progress_store.dart';
 
 /// Minimal static service locator — this app has no other cross-cutting
@@ -17,6 +18,7 @@ class AppServices {
   static late final ApiClient api;
   static late final AuthService auth;
   static late final MasterclassService masterclasses;
+  static late final UserService users;
   static late final WatchProgressStore watchProgress;
 
   /// Result of the startup `/health` check — read by [MainApp] to show a
@@ -25,9 +27,11 @@ class AppServices {
 
   static Future<void> init() async {
     storage = AuthStorage();
+    watchProgress = WatchProgressStore();
     auth = AuthService(
       ApiClient(baseUrl: ApiConfig.baseUrl, tokenProvider: () => storage.readToken(), onUnauthorized: () {}),
       storage,
+      watchProgress,
     );
     api = ApiClient(
       baseUrl: ApiConfig.baseUrl,
@@ -35,7 +39,7 @@ class AppServices {
       onUnauthorized: () => auth.handleUnauthorized(),
     );
     masterclasses = MasterclassService(api);
-    watchProgress = WatchProgressStore();
+    users = UserService(api);
 
     serverReachable = await api.checkHealth();
     debugPrint(

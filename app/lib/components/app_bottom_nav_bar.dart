@@ -5,14 +5,15 @@ import '../theme/app_typography.dart';
 
 enum AppNavTab { home, progress, classes, profile }
 
-/// Pill-style bottom navigation shared by Home Dashboard and Lesson Player.
-/// Non-active tabs are visual only in this iteration — no screens exist for
-/// Progress/Profile yet.
+/// Pill-style bottom navigation shared by Home Dashboard, Lesson Player, and
+/// Profile. Progress/Classes are still visual only — no screens exist for
+/// those yet.
 class AppBottomNavBar extends StatelessWidget {
-  const AppBottomNavBar({super.key, required this.activeTab, this.onHomeTap});
+  const AppBottomNavBar({super.key, required this.activeTab, this.onHomeTap, this.onProfileTap});
 
   final AppNavTab activeTab;
   final VoidCallback? onHomeTap;
+  final VoidCallback? onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +54,7 @@ class AppBottomNavBar extends StatelessWidget {
               icon: Icons.person_outline_rounded,
               label: 'Profile',
               active: activeTab == AppNavTab.profile,
+              onTap: onProfileTap,
             ),
           ],
         ),

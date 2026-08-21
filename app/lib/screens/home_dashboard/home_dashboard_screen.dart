@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../components/app_bottom_nav_bar.dart';
@@ -8,6 +10,7 @@ import '../../components/masterclass_card.dart';
 import '../../components/primary_button.dart';
 import '../../components/section_heading.dart';
 import '../../models/masterclass.dart';
+import '../../models/user_profile.dart';
 import '../../services/api_client.dart';
 import '../../services/app_services.dart';
 import '../../theme/app_colors.dart';
@@ -22,6 +25,7 @@ class HomeDashboardScreen extends StatefulWidget {
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   List<MasterclassSummary>? _masterclasses;
+  UserProfile? _profile;
   bool _loading = true;
   String? _error;
 
@@ -36,6 +40,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       _loading = true;
       _error = null;
     });
+    // Fetched separately from the masterclasses list (below) and not tied to
+    // `_error`: the greeting it feeds is decorative, so a `/me` hiccup
+    // shouldn't block the screen's primary content.
+    unawaited(_loadProfile());
     try {
       final masterclasses = await AppServices.masterclasses.list();
       if (!mounted) return;
@@ -45,6 +53,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await AppServices.users.getMe();
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    } on ApiException {
+      // Greeting falls back to role-only/generic copy below; not worth
+      // surfacing a separate error state for decorative copy.
     }
   }
 
@@ -86,6 +105,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final masterclasses = _masterclasses;
     final inProgress = _findInProgress(masterclasses);
 
+    final child = _profile?.child;
+    final roleLabel = _profile?.role.shortLabel;
+    final greeting = child != null && roleLabel != null
+        ? "Welcome, ${child.name}'s $roleLabel"
+        : roleLabel != null
+        ? 'Welcome, $roleLabel'
+        : 'Welcome back';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppTopBar(
@@ -94,13 +121,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         showAvatar: true,
         onAvatarTap: () => _showAccountMenu(context),
       ),
-      bottomNavigationBar: AppBottomNavBar(activeTab: AppNavTab.home),
+      bottomNavigationBar: AppBottomNavBar(
+        activeTab: AppNavTab.home,
+        onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Welcome, Test's Dad", style: AppTypography.heading1),
+            Text(greeting, style: AppTypography.heading1),
             const SizedBox(height: 8),
             Text('Ready to level up your superpower?', style: AppTypography.bodyLarge),
             const SizedBox(height: 32),

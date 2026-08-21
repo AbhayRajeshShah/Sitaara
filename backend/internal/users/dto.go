@@ -38,4 +38,5 @@ type MeResponse struct {
 	Role      sqlc.ParentRole    `json:"role"`
 	FamilyID  pgtype.UUID        `json:"familyId"`
 	CreatedAt pgtype.Timestamptz `json:"createdAt"`
+	Child     *ChildResponse     `json:"child,omitempty"`
 }

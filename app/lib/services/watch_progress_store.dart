@@ -17,4 +17,15 @@ class WatchProgressStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('$_keyPrefix$videoId', watchedSeconds);
   }
+
+  /// Wipes every cached watch position. Called on sign-out (and forced
+  /// logout) so a previously signed-in user's progress can't leak into the
+  /// next session on this device.
+  Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where((k) => k.startsWith(_keyPrefix));
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+  }
 }

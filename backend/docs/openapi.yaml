@@ -243,7 +243,8 @@ paths:
       description: >
         Returns the authenticated user's own account info, resolved from the
         `sub` claim of the bearer token via the `RequireAuth` middleware
-        (`internal/auth/middleware.go`).
+        (`internal/auth/middleware.go`), plus the family's child (looked up
+        by `familyId`, not carried on the user record itself).
       operationId: getMe
       security:
         - bearerAuth: []
@@ -887,6 +888,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        child:
+          allOf:
+            - $ref: "#/components/schemas/ChildResponse"
+          description: The family's child, if one exists (`GetChildByFamilyID`). Absent in the unexpected case a family has no child on file.
 
     InviteCodeResponse:
       type: object
