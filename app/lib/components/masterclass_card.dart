@@ -4,8 +4,12 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'image_placeholder.dart';
 
-/// Card used in the "Available Masterclasses" grid: thumbnail, optional
-/// badge, title, description, and a meta row (duration / lesson count).
+/// Card used in the home dashboard's horizontal masterclass rows
+/// (Available/Completed): thumbnail, optional badge, title, description
+/// (clamped to 2 lines so cards keep a consistent height in a horizontal
+/// scroller), and a meta row (duration / lesson count) pinned to the
+/// bottom of the card via `MainAxisAlignment.spaceBetween`, so it lines up
+/// at the same height across cards regardless of title/description length.
 class MasterclassCard extends StatelessWidget {
   const MasterclassCard({
     super.key,
@@ -49,45 +53,58 @@ class MasterclassCard extends StatelessWidget {
                 width: double.infinity,
                 child: const ImagePlaceholder(icon: Icons.smart_display_outlined),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (badgeLabel != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(9999),
-                        ),
-                        child: Text(
-                          badgeLabel!,
-                          style: AppTypography.labelSmall.copyWith(color: AppColors.deepPurple),
-                        ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (badgeLabel != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(9999),
+                              ),
+                              child: Text(
+                                badgeLabel!,
+                                style: AppTypography.labelSmall.copyWith(color: AppColors.deepPurple),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          Text(title, style: AppTypography.cardTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 8),
+                          Text(
+                            description,
+                            style: AppTypography.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (duration != null) ...[
+                            Icon(Icons.access_time_rounded, size: 13, color: AppColors.bodyText),
+                            const SizedBox(width: 4),
+                            Text(duration!, style: AppTypography.labelSmall),
+                          ],
+                          if (lessonCount != null) ...[
+                            if (duration != null) const SizedBox(width: 16),
+                            Icon(Icons.menu_book_rounded, size: 13, color: AppColors.bodyText),
+                            const SizedBox(width: 4),
+                            Text(lessonCount!, style: AppTypography.labelSmall),
+                          ],
+                        ],
+                      ),
                     ],
-                    Text(title, style: AppTypography.cardTitle),
-                    const SizedBox(height: 8),
-                    Text(description, style: AppTypography.body),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        if (duration != null) ...[
-                          Icon(Icons.access_time_rounded, size: 13, color: AppColors.bodyText),
-                          const SizedBox(width: 4),
-                          Text(duration!, style: AppTypography.labelSmall),
-                        ],
-                        if (lessonCount != null) ...[
-                          if (duration != null) const SizedBox(width: 16),
-                          Icon(Icons.menu_book_rounded, size: 13, color: AppColors.bodyText),
-                          const SizedBox(width: 4),
-                          Text(lessonCount!, style: AppTypography.labelSmall),
-                        ],
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],

@@ -138,7 +138,8 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.partner,
         onHomeTap: () => Navigator.of(context).pushReplacementNamed('/home'),
-        onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
+        onProfileTap: () =>
+            Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -190,11 +191,16 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: invite == null
           ? [
-              Text("You don't have any active invite codes.", style: AppTypography.label),
+              Text(
+                "You don't have any active invite codes.",
+                style: AppTypography.label,
+              ),
               const SizedBox(height: 4),
               Text(
                 'Generate one to invite your partner.',
-                style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText),
+                style: AppTypography.labelSmall.copyWith(
+                  color: AppColors.bodyText,
+                ),
               ),
               const SizedBox(height: 16),
               PrimaryButton(
@@ -205,7 +211,10 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
               ),
             ]
           : [
-              Text('Share this code with your partner', style: AppTypography.label),
+              Text(
+                'Share this code with your partner',
+                style: AppTypography.label,
+              ),
               const SizedBox(height: 12),
               _CodeCard(code: invite.code),
               const SizedBox(height: 16),
@@ -242,14 +251,23 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
           borderRadius: 8,
         ),
         const SizedBox(height: 16),
-        PrimaryButton(label: 'Join', icon: Icons.link_rounded, loading: _joining, onPressed: _submitJoin),
+        PrimaryButton(
+          label: 'Join',
+          icon: Icons.link_rounded,
+          loading: _joining,
+          onPressed: _submitJoin,
+        ),
       ],
     );
   }
 }
 
 class _TabSwitcher extends StatelessWidget {
-  const _TabSwitcher({required this.index, required this.labels, required this.onChanged});
+  const _TabSwitcher({
+    required this.index,
+    required this.labels,
+    required this.onChanged,
+  });
 
   final int index;
   final List<String> labels;
@@ -281,7 +299,9 @@ class _TabSwitcher extends StatelessWidget {
                   child: Text(
                     labels[i],
                     style: AppTypography.label.copyWith(
-                      color: i == index ? AppColors.navPillText : AppColors.bodyText,
+                      color: i == index
+                          ? AppColors.navPillText
+                          : AppColors.bodyText,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -299,29 +319,41 @@ class _SyncedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 64),
-      child: Column(
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: const BoxDecoration(color: AppColors.deepPurple, shape: BoxShape.circle),
-            child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 32),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "You're synced with your partner!",
-            textAlign: TextAlign.center,
-            style: AppTypography.heading3,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'You can both see shared progress and activity.',
-            textAlign: TextAlign.center,
-            style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText),
-          ),
-        ],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 64),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: AppColors.deepPurple,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.favorite_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "You're synced with your partner!",
+              textAlign: TextAlign.center,
+              style: AppTypography.heading3,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You can both see shared progress and activity.',
+              textAlign: TextAlign.center,
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.bodyText,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -335,7 +367,8 @@ class _CodeCard extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: code));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Code copied')));
     }
   }
 
@@ -346,7 +379,13 @@ class _CodeCard extends StatelessWidget {
         color: Colors.white,
         border: Border.all(color: AppColors.neutralBorder),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 20, offset: Offset(0, 4))],
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -384,9 +423,16 @@ class _ErrorState extends StatelessWidget {
         children: [
           Text("Couldn't load partner info", style: AppTypography.label),
           const SizedBox(height: 4),
-          Text(message, style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText)),
+          Text(
+            message,
+            style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText),
+          ),
           const SizedBox(height: 16),
-          PrimaryButton(label: 'Retry', icon: Icons.refresh_rounded, onPressed: onRetry),
+          PrimaryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
         ],
       ),
     );

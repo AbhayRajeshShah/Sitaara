@@ -122,7 +122,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
       if (!mounted) return;
       setState(() => _detail = detail);
       if (detail.videos.isNotEmpty) {
-        await _selectVideo(0, autoplay: false);
+        await _selectVideo(_nextIncompleteVideoIndex(detail.videos), autoplay: false);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -130,6 +130,17 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// The first video the caller hasn't finished watching, so reopening a
+  /// masterclass picks up where they left off instead of always restarting
+  /// at index 0. Falls back to the last video if everything's complete.
+  int _nextIncompleteVideoIndex(List<VideoSummary> videos) {
+    for (var i = 0; i < videos.length; i++) {
+      final self = videos[i].members.firstWhere((m) => m.isYou);
+      if (self.watchedSeconds < videos[i].durationSeconds) return i;
+    }
+    return videos.length - 1;
   }
 
   Future<void> _selectVideo(int index, {required bool autoplay}) async {

@@ -40,6 +40,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       _loading = true;
       _error = null;
     });
+    await _refresh();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  /// Re-fetches without the full-screen spinner, so existing content stays
+  /// visible while it updates — used by pull-to-refresh and by
+  /// [_openLesson] on return from the lesson player.
+  Future<void> _refresh() async {
     // Fetched separately from the masterclasses list (below) and not tied to
     // `_error`: the greeting it feeds is decorative, so a `/me` hiccup
     // shouldn't block the screen's primary content.
@@ -47,12 +55,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     try {
       final masterclasses = await AppServices.masterclasses.list();
       if (!mounted) return;
-      setState(() => _masterclasses = masterclasses);
+      setState(() {
+        _masterclasses = masterclasses;
+        _error = null;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -67,10 +76,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     }
   }
 
-  void _openLesson(BuildContext context, MasterclassSummary masterclass) {
-    Navigator.of(
-      context,
-    ).pushNamed('/lesson-player', arguments: {'masterclassId': masterclass.id, 'title': masterclass.title});
+  Future<void> _openLesson(
+    BuildContext context,
+    MasterclassSummary masterclass,
+  ) async {
+    await Navigator.of(context).pushNamed(
+      '/lesson-player',
+      arguments: {'masterclassId': masterclass.id, 'title': masterclass.title},
+    );
+    if (!mounted) return;
+    _refresh();
   }
 
   Future<void> _showAccountMenu(BuildContext context) async {
@@ -79,8 +94,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       builder: (context) => AlertDialog(
         title: Text(AppServices.auth.currentSession?.email ?? 'Account'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Sign Out')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign Out'),
+          ),
         ],
       ),
     );
@@ -91,19 +112,84 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     }
   }
 
-  MasterclassSummary? _findInProgress(List<MasterclassSummary>? masterclasses) {
-    if (masterclasses == null) return null;
+  /// Buckets masterclasses into mutually-exclusive Currently Watching /
+  /// Partner Up / Available / Completed lists based on
+  /// `yourProgress.percentComplete`. "Partner up" pulls out masterclasses
+  /// the user hasn't started yet but their partner has, so that nudge
+  /// doesn't also show up in "Available".
+  ({
+    List<MasterclassSummary> inProgress,
+    List<MasterclassSummary> partnerAhead,
+    List<MasterclassSummary> available,
+    List<MasterclassSummary> completed,
+  })
+  _categorize(List<MasterclassSummary> masterclasses) {
+    final inProgress = <MasterclassSummary>[];
+    final partnerAhead = <MasterclassSummary>[];
+    final available = <MasterclassSummary>[];
+    final completed = <MasterclassSummary>[];
     for (final m in masterclasses) {
       final percent = m.yourProgress?.percentComplete;
-      if (percent != null && percent > 0 && percent < 100) return m;
+      final partnerPercent = m.partnerProgress?.percentComplete;
+      if (percent == 100) {
+        completed.add(m);
+      } else if (percent != null && percent > 0) {
+        inProgress.add(m);
+      } else if (partnerPercent != null && partnerPercent > 0) {
+        partnerAhead.add(m);
+      } else {
+        available.add(m);
+      }
     }
-    return null;
+    return (
+      inProgress: inProgress,
+      partnerAhead: partnerAhead,
+      available: available,
+      completed: completed,
+    );
+  }
+
+  /// A horizontally-scrollable row of cards, each sized to leave a visible
+  /// sliver of the next card (indicating there's more to scroll to), all at
+  /// a fixed [height] so every card in the row matches — [height] must be
+  /// tall enough to fit [cardBuilder]'s tallest possible content for the
+  /// card type being used (see call sites).
+  Widget _horizontalCardList<T>({
+    required List<T> items,
+    required double height,
+    required Widget Function(BuildContext context, T item) cardBuilder,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = items.length == 1
+            ? constraints.maxWidth
+            : constraints.maxWidth * 0.78;
+        return SizedBox(
+          height: height,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  SizedBox(
+                    width: cardWidth,
+                    child: cardBuilder(context, items[i]),
+                  ),
+                  if (i != items.length - 1) const SizedBox(width: 12),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final masterclasses = _masterclasses;
-    final inProgress = _findInProgress(masterclasses);
+    final buckets = masterclasses == null ? null : _categorize(masterclasses);
 
     final child = _profile?.child;
     final roleLabel = _profile?.role.shortLabel;
@@ -123,54 +209,117 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       ),
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.home,
-        onPartnerTap: () => Navigator.of(context).pushReplacementNamed('/partner-link'),
-        onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
+        onPartnerTap: () =>
+            Navigator.of(context).pushReplacementNamed('/partner-link'),
+        onProfileTap: () =>
+            Navigator.of(context).pushReplacementNamed('/profile'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(greeting, style: AppTypography.heading1),
-            const SizedBox(height: 8),
-            Text('Ready to level up your superpower?', style: AppTypography.bodyLarge),
-            const SizedBox(height: 32),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 48),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null)
-              _ErrorState(message: _error!, onRetry: _load)
-            else ...[
-              if (inProgress != null) ...[
-                const SectionHeading(icon: Icons.play_circle_outline_rounded, title: 'Currently watching'),
-                const SizedBox(height: 16),
-                _CurrentlyWatchingCard(
-                  title: inProgress.title,
-                  subtitle:
-                      '${inProgress.yourProgress!.completedVideos} of '
-                      '${inProgress.yourProgress!.totalVideos} lessons complete',
-                  yourPercent: inProgress.yourProgress!.percentComplete,
-                  partnerPercent: inProgress.partnerProgress?.percentComplete,
-                  onTap: () => _openLesson(context, inProgress),
-                ),
-                const SizedBox(height: 32),
-              ],
-              const SectionHeading(icon: Icons.school_outlined, title: 'Available Masterclasses'),
-              const SizedBox(height: 16),
-              for (final masterclass in masterclasses!) ...[
-                MasterclassCard(
-                  title: masterclass.title,
-                  description: masterclass.description ?? '',
-                  lessonCount: '${masterclass.totalVideos} Lesson${masterclass.totalVideos == 1 ? '' : 's'}',
-                  badgeLabel: masterclass.yourProgress?.percentComplete == 100 ? 'Completed' : null,
-                  onTap: () => _openLesson(context, masterclass),
-                ),
-                const SizedBox(height: 16),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(greeting, style: AppTypography.heading1),
+              const SizedBox(height: 8),
+              Text(
+                'Ready to level up your superpower?',
+                style: AppTypography.bodyLarge,
+              ),
+              const SizedBox(height: 32),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null)
+                _ErrorState(message: _error!, onRetry: _load)
+              else if (buckets != null) ...[
+                if (buckets.inProgress.isNotEmpty) ...[
+                  const SectionHeading(
+                    icon: Icons.play_circle_outline_rounded,
+                    title: 'Currently watching',
+                  ),
+                  const SizedBox(height: 16),
+                  _horizontalCardList<MasterclassSummary>(
+                    items: buckets.inProgress,
+                    height: 385,
+                    cardBuilder: (context, m) => _CurrentlyWatchingCard(
+                      title: m.title,
+                      subtitle:
+                          '${m.yourProgress!.completedVideos} of ${m.yourProgress!.totalVideos} lessons complete',
+                      yourPercent: m.yourProgress!.percentComplete,
+                      partnerPercent: m.partnerProgress?.percentComplete,
+                      onTap: () => _openLesson(context, m),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+                if (buckets.partnerAhead.isNotEmpty) ...[
+                  const SectionHeading(
+                    icon: Icons.favorite_rounded,
+                    title: 'Partner up',
+                  ),
+                  const SizedBox(height: 16),
+                  _horizontalCardList<MasterclassSummary>(
+                    items: buckets.partnerAhead,
+                    height: 350,
+                    cardBuilder: (context, m) => MasterclassCard(
+                      title: m.title,
+                      description: m.description ?? '',
+                      lessonCount:
+                          '${m.totalVideos} Lesson${m.totalVideos == 1 ? '' : 's'}',
+                      badgeLabel:
+                          '${m.partnerProgress!.role.shortLabel} is '
+                          '${m.partnerProgress!.percentComplete}% in',
+                      onTap: () => _openLesson(context, m),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+                if (buckets.available.isNotEmpty) ...[
+                  const SectionHeading(
+                    icon: Icons.school_outlined,
+                    title: 'Available Masterclasses',
+                  ),
+                  const SizedBox(height: 16),
+                  _horizontalCardList<MasterclassSummary>(
+                    items: buckets.available,
+                    height: 320,
+                    cardBuilder: (context, m) => MasterclassCard(
+                      title: m.title,
+                      description: m.description ?? '',
+                      lessonCount:
+                          '${m.totalVideos} Lesson${m.totalVideos == 1 ? '' : 's'}',
+                      onTap: () => _openLesson(context, m),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+                if (buckets.completed.isNotEmpty) ...[
+                  const SectionHeading(
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Completed',
+                  ),
+                  const SizedBox(height: 16),
+                  _horizontalCardList<MasterclassSummary>(
+                    items: buckets.completed,
+                    height: 350,
+                    cardBuilder: (context, m) => MasterclassCard(
+                      title: m.title,
+                      description: m.description ?? '',
+                      lessonCount:
+                          '${m.totalVideos} Lesson${m.totalVideos == 1 ? '' : 's'}',
+                      badgeLabel: 'Completed',
+                      onTap: () => _openLesson(context, m),
+                    ),
+                  ),
+                ],
               ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -192,9 +341,16 @@ class _ErrorState extends StatelessWidget {
         children: [
           Text("Couldn't load masterclasses", style: AppTypography.label),
           const SizedBox(height: 4),
-          Text(message, style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText)),
+          Text(
+            message,
+            style: AppTypography.labelSmall.copyWith(color: AppColors.bodyText),
+          ),
           const SizedBox(height: 16),
-          PrimaryButton(label: 'Retry', icon: Icons.refresh_rounded, onPressed: onRetry),
+          PrimaryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
         ],
       ),
     );
@@ -228,7 +384,13 @@ class _CurrentlyWatchingCard extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.neutralBorder),
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 20, offset: Offset(0, 4))],
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.cardShadow,
+                blurRadius: 20,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -240,48 +402,93 @@ class _CurrentlyWatchingCard extends StatelessWidget {
                   const SizedBox(
                     height: 192,
                     width: double.infinity,
-                    child: ImagePlaceholder(icon: Icons.family_restroom_rounded, iconSize: 40),
+                    child: ImagePlaceholder(
+                      icon: Icons.family_restroom_rounded,
+                      iconSize: 40,
+                    ),
                   ),
                   Container(
                     width: 60,
                     height: 60,
-                    decoration: const BoxDecoration(color: AppColors.deepPurple, shape: BoxShape.circle),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                    decoration: const BoxDecoration(
+                      color: AppColors.deepPurple,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppTypography.heading4),
-                    const SizedBox(height: 8),
-                    Text(subtitle, style: AppTypography.body),
-                    const SizedBox(height: 8),
-                    DualProgressBar(
-                      userProgress: yourPercent / 100,
-                      partnerProgress: partnerPercent == null ? null : partnerPercent! / 100,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('$yourPercent% Complete', style: AppTypography.labelSmall),
-                        if (partnerPercent != null)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: AppTypography.heading4,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            style: AppTypography.body,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DualProgressBar(
+                            userProgress: yourPercent / 100,
+                            partnerProgress: partnerPercent == null
+                                ? null
+                                : partnerPercent! / 100,
+                          ),
+                          const SizedBox(height: 8),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Icon(Icons.favorite_rounded, size: 14, color: AppColors.deepPurple),
-                              const SizedBox(width: 4),
                               Text(
-                                'Partner at $partnerPercent%',
-                                style: AppTypography.labelSmall.copyWith(color: AppColors.deepPurple),
+                                '$yourPercent% Complete',
+                                style: AppTypography.labelSmall,
                               ),
+                              if (partnerPercent != null)
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.favorite_rounded,
+                                      size: 14,
+                                      color: AppColors.deepPurple,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Partner at $partnerPercent%',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: AppColors.deepPurple,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
