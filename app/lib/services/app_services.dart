@@ -4,6 +4,7 @@ import '../config/api_config.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
 import 'auth_storage.dart';
+import 'masterclass_service.dart';
 
 /// Minimal static service locator — this app has no other cross-cutting
 /// state yet, so a DI package would be overkill. Call [init] once before
@@ -14,6 +15,7 @@ class AppServices {
   static late final AuthStorage storage;
   static late final ApiClient api;
   static late final AuthService auth;
+  static late final MasterclassService masterclasses;
 
   /// Result of the startup `/health` check — read by [MainApp] to show a
   /// banner when the backend wasn't reachable at launch.
@@ -30,6 +32,7 @@ class AppServices {
       tokenProvider: () => storage.readToken(),
       onUnauthorized: () => auth.handleUnauthorized(),
     );
+    masterclasses = MasterclassService(api);
 
     serverReachable = await api.checkHealth();
     debugPrint(

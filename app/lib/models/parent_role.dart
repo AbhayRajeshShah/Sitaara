@@ -19,6 +19,19 @@ enum ParentRole {
     }
   }
 
+  /// Casual short label for inline copy like "Liked by You, Mom" or "Mom is
+  /// watching" ("Mom"/"Dad"/"Guardian").
+  String get shortLabel {
+    switch (this) {
+      case ParentRole.dad:
+        return 'Dad';
+      case ParentRole.mom:
+        return 'Mom';
+      case ParentRole.guardian:
+        return 'Guardian';
+    }
+  }
+
   static ParentRole fromApiValue(String value) {
     return ParentRole.values.firstWhere(
       (role) => role.apiValue == value,

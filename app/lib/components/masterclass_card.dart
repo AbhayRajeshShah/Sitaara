@@ -11,7 +11,7 @@ class MasterclassCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.description,
-    required this.duration,
+    this.duration,
     this.lessonCount,
     this.badgeLabel,
     this.thumbnailHeight = 160,
@@ -20,7 +20,7 @@ class MasterclassCard extends StatelessWidget {
 
   final String title;
   final String description;
-  final String duration;
+  final String? duration;
   final String? lessonCount;
   final String? badgeLabel;
   final double thumbnailHeight;
@@ -38,9 +38,7 @@ class MasterclassCard extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.neutralBorder),
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(color: AppColors.cardShadow, blurRadius: 20, offset: Offset(0, 4)),
-            ],
+            boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 20, offset: Offset(0, 4))],
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -76,11 +74,13 @@ class MasterclassCard extends StatelessWidget {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        Icon(Icons.access_time_rounded, size: 13, color: AppColors.bodyText),
-                        const SizedBox(width: 4),
-                        Text(duration, style: AppTypography.labelSmall),
+                        if (duration != null) ...[
+                          Icon(Icons.access_time_rounded, size: 13, color: AppColors.bodyText),
+                          const SizedBox(width: 4),
+                          Text(duration!, style: AppTypography.labelSmall),
+                        ],
                         if (lessonCount != null) ...[
-                          const SizedBox(width: 16),
+                          if (duration != null) const SizedBox(width: 16),
                           Icon(Icons.menu_book_rounded, size: 13, color: AppColors.bodyText),
                           const SizedBox(width: 4),
                           Text(lessonCount!, style: AppTypography.labelSmall),
