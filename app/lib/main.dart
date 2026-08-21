@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/child_details/child_details_screen.dart';
 import 'screens/home_dashboard/home_dashboard_screen.dart';
 import 'screens/lesson_player/lesson_player_screen.dart';
+import 'screens/partner_link/partner_link_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/role_selection/role_selection_screen.dart';
 import 'screens/sign_in/sign_in_screen.dart';
@@ -34,6 +35,7 @@ class MainApp extends StatelessWidget {
         '/home': (context) => const HomeDashboardScreen(),
         '/lesson-player': (context) => const LessonPlayerScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/partner-link': (context) => const PartnerLinkScreen(),
       },
       builder: (context, child) {
         if (child == null || AppServices.serverReachable) return child ?? const SizedBox.shrink();

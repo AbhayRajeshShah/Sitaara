@@ -12,3 +12,7 @@ SELECT * FROM children
 WHERE family_id = $1
 ORDER BY created_at ASC
 LIMIT 1;
+
+-- name: DeleteChildrenByFamilyID :exec
+DELETE FROM children
+WHERE family_id = $1;

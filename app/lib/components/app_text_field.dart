@@ -24,6 +24,7 @@ class AppTextField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.enabled = true,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final String label;
@@ -42,6 +43,7 @@ class AppTextField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final bool enabled;
+  final TextCapitalization textCapitalization;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +64,7 @@ class AppTextField extends StatelessWidget {
           readOnly: readOnly,
           onTap: onTap,
           enabled: enabled,
+          textCapitalization: textCapitalization,
           style: AppTypography.body.copyWith(color: AppColors.headingText),
           decoration: InputDecoration(
             hintText: hint,

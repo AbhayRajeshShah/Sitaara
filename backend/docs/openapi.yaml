@@ -19,7 +19,7 @@ tags:
   - name: auth
     description: Authentication (sign-in, token issuance)
   - name: invites
-    description: Invite-code generation and lookup for linking a partner
+    description: Invite-code generation, redemption, and partner-link status
   - name: videos
     description: Video engagement (likes, watch progress) shared within a family
   - name: masterclasses
@@ -360,6 +360,124 @@ paths:
               example:
                 error: no active invite code for this family
                 code: no_active_invite
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+  /invite-codes/{code}/redeem:
+    post:
+      tags: [invites]
+      summary: Redeem an invite code to switch families
+      description: >
+        Lets an **already-linked** user redeem a different family's invite
+        code, replacing their own family membership with it. Since the
+        schema has no `ON DELETE CASCADE` anywhere, the caller's current
+        family — including its child — is cascade-deleted by hand inside one
+        transaction, in FK-safe order, only after every constraint below is
+        confirmed to hold; nothing is deleted if any of them fail. Only
+        allowed while the caller is the sole member of their current family
+        — switching away while a partner is linked would destroy the
+        partner's data without their consent, so that's rejected instead.
+      operationId: redeemInviteCode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The invite code to redeem.
+      responses:
+        "200":
+          description: Switched families successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedeemResponse"
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: missing or malformed authorization header
+                code: unauthorized
+        "404":
+          description: Invite code does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: invite code not found
+                code: invite_not_found
+        "409":
+          description: The redeem was rejected by a business rule.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              examples:
+                alreadyUsed:
+                  value: { error: invite code has already been redeemed, code: invite_already_used }
+                selfRedeem:
+                  value: { error: you cannot redeem your own invite code, code: self_redeem_not_allowed }
+                alreadyInFamily:
+                  value: { error: you already belong to this family, code: already_in_family }
+                hasPartner:
+                  value:
+                    {
+                      error: "you're linked to a partner — switching families isn't supported while linked",
+                      code: family_has_partner,
+                    }
+                targetFull:
+                  value: { error: this family already has two linked parents, code: family_has_two_parents }
+                roleTaken:
+                  value: { error: this family already has a dad, code: family_already_has_role }
+        "500":
+          description: Unexpected internal/database error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: something went wrong
+                code: internal_error
+
+  /partner/status:
+    get:
+      tags: [invites]
+      summary: Check whether a partner is linked
+      description: >
+        Returns whether the caller's family currently has two members (i.e.
+        a partner has joined via invite code).
+      operationId: getPartnerStatus
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Partner-linked status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          description: Missing, malformed, or expired/invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+              example:
+                error: missing or malformed authorization header
+                code: unauthorized
         "500":
           description: Unexpected internal/database error.
           content:
@@ -906,6 +1024,40 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    StatusResponse:
+      type: object
+      required: [isConnected]
+      properties:
+        isConnected:
+          type: boolean
+          description: True if the caller's family currently has two members.
+
+    SwitchChildResponse:
+      type: object
+      required: [id, name, dob]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        dob:
+          type: string
+          format: date
+
+    RedeemResponse:
+      type: object
+      required: [familyId]
+      properties:
+        familyId:
+          type: string
+          format: uuid
+          description: The id of the family the caller now belongs to.
+        child:
+          allOf:
+            - $ref: "#/components/schemas/SwitchChildResponse"
+          description: The new family's child, if one exists.
 
     FamilyMemberActivity:
       type: object

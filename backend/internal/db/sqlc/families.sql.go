@@ -7,6 +7,8 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createFamily = `-- name: CreateFamily :one
@@ -19,4 +21,14 @@ func (q *Queries) CreateFamily(ctx context.Context) (Family, error) {
 	var i Family
 	err := row.Scan(&i.ID, &i.CreatedAt)
 	return i, err
+}
+
+const deleteFamily = `-- name: DeleteFamily :exec
+DELETE FROM families
+WHERE id = $1
+`
+
+func (q *Queries) DeleteFamily(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteFamily, id)
+	return err
 }

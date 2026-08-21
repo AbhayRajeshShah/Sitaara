@@ -36,6 +36,16 @@ func (q *Queries) CreateChild(ctx context.Context, arg CreateChildParams) (Child
 	return i, err
 }
 
+const deleteChildrenByFamilyID = `-- name: DeleteChildrenByFamilyID :exec
+DELETE FROM children
+WHERE family_id = $1
+`
+
+func (q *Queries) DeleteChildrenByFamilyID(ctx context.Context, familyID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteChildrenByFamilyID, familyID)
+	return err
+}
+
 const getChild = `-- name: GetChild :one
 SELECT id, family_id, name, date_of_birth, created_at FROM children
 WHERE id = $1

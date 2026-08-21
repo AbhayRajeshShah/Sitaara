@@ -14,3 +14,9 @@ WHERE id = $1;
 -- name: ListUsersByFamilyID :many
 SELECT * FROM users
 WHERE family_id = $1;
+
+-- name: UpdateUserFamily :one
+UPDATE users
+SET family_id = $2
+WHERE id = $1
+RETURNING *;

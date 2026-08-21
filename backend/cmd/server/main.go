@@ -74,6 +74,8 @@ func main() {
 		r.Get("/me", usersHandler.Me)
 		r.Post("/invite-codes", invitesHandler.Generate)
 		r.Get("/invite-codes/active", invitesHandler.GetActive)
+		r.Post("/invite-codes/{code}/redeem", invitesHandler.Redeem)
+		r.Get("/partner/status", invitesHandler.Status)
 		r.Get("/masterclasses", masterclassesHandler.List)
 		r.Get("/masterclasses/{id}", masterclassesHandler.GetDetail)
 	})

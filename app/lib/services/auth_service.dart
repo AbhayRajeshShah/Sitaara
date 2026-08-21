@@ -86,6 +86,12 @@ String friendlyAuthError(ApiException e) {
       return 'This family already has two parents linked.';
     case 'family_already_has_role':
       return e.message;
+    case 'self_redeem_not_allowed':
+      return "You can't redeem your own invite code.";
+    case 'already_in_family':
+      return 'You already belong to this family.';
+    case 'family_has_partner':
+      return "You're already linked to a partner.";
     case 'network_error':
       return e.message;
     case 'internal_error':

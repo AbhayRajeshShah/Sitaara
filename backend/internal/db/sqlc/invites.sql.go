@@ -48,6 +48,16 @@ func (q *Queries) DeleteActiveInvitesForFamily(ctx context.Context, familyID pgt
 	return err
 }
 
+const deleteInviteCodesByFamilyID = `-- name: DeleteInviteCodesByFamilyID :exec
+DELETE FROM invite_codes
+WHERE family_id = $1
+`
+
+func (q *Queries) DeleteInviteCodesByFamilyID(ctx context.Context, familyID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteInviteCodesByFamilyID, familyID)
+	return err
+}
+
 const getActiveInviteForFamily = `-- name: GetActiveInviteForFamily :one
 SELECT id, code, generated_by_user_id, redeemed_by_user_id, family_id, created_at, redeemed_at FROM invite_codes
 WHERE family_id = $1 AND redeemed_by_user_id IS NULL

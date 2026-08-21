@@ -24,6 +24,10 @@ RETURNING *;
 DELETE FROM invite_codes
 WHERE family_id = $1 AND redeemed_by_user_id IS NULL;
 
+-- name: DeleteInviteCodesByFamilyID :exec
+DELETE FROM invite_codes
+WHERE family_id = $1;
+
 -- name: GetActiveInviteForFamily :one
 SELECT * FROM invite_codes
 WHERE family_id = $1 AND redeemed_by_user_id IS NULL

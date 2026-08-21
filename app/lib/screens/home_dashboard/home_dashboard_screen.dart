@@ -123,6 +123,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       ),
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.home,
+        onPartnerTap: () => Navigator.of(context).pushReplacementNamed('/partner-link'),
         onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       body: SingleChildScrollView(

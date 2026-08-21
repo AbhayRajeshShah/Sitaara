@@ -287,6 +287,7 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
       ),
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.classes,
+        onPartnerTap: () => Navigator.of(context).pushReplacementNamed('/partner-link'),
         onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       body: SingleChildScrollView(

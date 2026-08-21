@@ -5,6 +5,7 @@ import 'api_client.dart';
 import 'auth_service.dart';
 import 'auth_storage.dart';
 import 'masterclass_service.dart';
+import 'partner_service.dart';
 import 'user_service.dart';
 import 'watch_progress_store.dart';
 
@@ -19,6 +20,7 @@ class AppServices {
   static late final AuthService auth;
   static late final MasterclassService masterclasses;
   static late final UserService users;
+  static late final PartnerService partner;
   static late final WatchProgressStore watchProgress;
 
   /// Result of the startup `/health` check — read by [MainApp] to show a
@@ -40,6 +42,7 @@ class AppServices {
     );
     masterclasses = MasterclassService(api);
     users = UserService(api);
+    partner = PartnerService(api);
 
     serverReachable = await api.checkHealth();
     debugPrint(

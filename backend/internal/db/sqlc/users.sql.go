@@ -112,3 +112,29 @@ func (q *Queries) ListUsersByFamilyID(ctx context.Context, familyID pgtype.UUID)
 	}
 	return items, nil
 }
+
+const updateUserFamily = `-- name: UpdateUserFamily :one
+UPDATE users
+SET family_id = $2
+WHERE id = $1
+RETURNING id, email, password_hash, role, family_id, created_at
+`
+
+type UpdateUserFamilyParams struct {
+	ID       pgtype.UUID `json:"id"`
+	FamilyID pgtype.UUID `json:"family_id"`
+}
+
+func (q *Queries) UpdateUserFamily(ctx context.Context, arg UpdateUserFamilyParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserFamily, arg.ID, arg.FamilyID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.FamilyID,
+		&i.CreatedAt,
+	)
+	return i, err
+}

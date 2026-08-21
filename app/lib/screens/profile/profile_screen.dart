@@ -75,6 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.profile,
         onHomeTap: () => Navigator.of(context).pushReplacementNamed('/home'),
+        onPartnerTap: () => Navigator.of(context).pushReplacementNamed('/partner-link'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
