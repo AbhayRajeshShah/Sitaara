@@ -62,14 +62,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _signOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await AppServices.auth.signOut();
+    if (!context.mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.pageBg,
       appBar: AppTopBar(
         title: 'Profile',
-        leadingIcon: Icons.menu,
-        onLeadingTap: () => Navigator.of(context).maybePop(),
         showAvatar: true,
       ),
       bottomNavigationBar: AppBottomNavBar(
@@ -120,6 +143,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _InfoRow(label: 'Date of birth', value: _formatDate(child.dateOfBirth)),
                 ],
               ),
+        const SizedBox(height: 32),
+        PrimaryButton(
+          label: 'Log Out',
+          icon: Icons.logout_rounded,
+          backgroundColor: AppColors.deepPurple,
+          onPressed: () => _signOut(context),
+        ),
       ],
     );
   }

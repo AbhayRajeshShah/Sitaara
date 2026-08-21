@@ -108,6 +108,29 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
     setState(() => _joinError = code.isEmpty ? 'Enter an invite code' : null);
     if (_joinError != null) return;
 
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join your partner?'),
+        content: const Text(
+          "Your current child information will be lost when you join your "
+          "partner's family. This can't be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+
     setState(() => _joining = true);
     try {
       await AppServices.partner.redeem(code);
@@ -131,9 +154,9 @@ class _PartnerLinkScreenState extends State<PartnerLinkScreen> {
       backgroundColor: AppColors.pageBg,
       appBar: AppTopBar(
         title: 'Partner',
-        leadingIcon: Icons.menu,
-        onLeadingTap: () => Navigator.of(context).maybePop(),
         showAvatar: true,
+        onAvatarTap: () =>
+            Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.partner,

@@ -3,22 +3,19 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
-/// Shared top app bar: a leading menu/back icon, a centered-ish Quicksand
-/// title, and an optional trailing circular avatar placeholder.
+/// Shared top app bar: a centered-ish Quicksand title and an optional
+/// trailing circular avatar placeholder. Navigation between screens is
+/// handled by the bottom nav bar, so there's no leading menu/back icon.
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   const AppTopBar({
     super.key,
     required this.title,
-    this.leadingIcon = Icons.menu,
-    this.onLeadingTap,
     this.showAvatar = false,
     this.titleFontSize = 20,
     this.onAvatarTap,
   });
 
   final String title;
-  final IconData leadingIcon;
-  final VoidCallback? onLeadingTap;
   final bool showAvatar;
   final double titleFontSize;
   final VoidCallback? onAvatarTap;
@@ -29,7 +26,11 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       decoration: BoxDecoration(
         color: AppColors.pageBg,
         boxShadow: const [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 10, offset: Offset(0, 4)),
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -37,15 +38,12 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
         bottom: false,
         child: Row(
           children: [
-            IconButton(
-              icon: Icon(leadingIcon, color: AppColors.deepPurple),
-              onPressed: onLeadingTap,
-            ),
+            const SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
                 style: AppTypography.heading2.copyWith(fontSize: titleFontSize),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.left,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -61,10 +59,17 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.lightPurpleBg, width: 2),
+                      border: Border.all(
+                        color: AppColors.lightPurpleBg,
+                        width: 2,
+                      ),
                       color: AppColors.iconCircleBg,
                     ),
-                    child: const Icon(Icons.person, color: AppColors.primary, size: 20),
+                    child: const Icon(
+                      Icons.person,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                   ),
                 ),
               )

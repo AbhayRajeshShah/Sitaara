@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
-enum AppNavTab { home, partner, classes, profile }
+enum AppNavTab { home, partner, profile }
 
 /// Pill-style bottom navigation shared by Home Dashboard, Lesson Player,
-/// Partner Link, and Profile. Classes is still visual only — no screen
-/// exists for it yet.
+/// Partner Link, and Profile.
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -17,7 +16,9 @@ class AppBottomNavBar extends StatelessWidget {
     this.onProfileTap,
   });
 
-  final AppNavTab activeTab;
+  /// Null when no tab represents the current screen (e.g. Lesson Player),
+  /// so nothing is highlighted.
+  final AppNavTab? activeTab;
   final VoidCallback? onHomeTap;
   final VoidCallback? onPartnerTap;
   final VoidCallback? onProfileTap;
@@ -52,11 +53,6 @@ class AppBottomNavBar extends StatelessWidget {
               label: 'Partner',
               active: activeTab == AppNavTab.partner,
               onTap: onPartnerTap,
-            ),
-            _NavItem(
-              icon: Icons.school_rounded,
-              label: 'Classes',
-              active: activeTab == AppNavTab.classes,
             ),
             _NavItem(
               icon: Icons.person_outline_rounded,

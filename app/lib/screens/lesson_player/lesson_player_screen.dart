@@ -276,6 +276,25 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
     }
   }
 
+  /// Re-fetches without the full-screen spinner, so the currently playing
+  /// video keeps playing — used by pull-to-refresh to pick up updated
+  /// progress/likes/partner activity.
+  Future<void> _refresh() async {
+    final id = _masterclassId;
+    if (id == null) return;
+    try {
+      final detail = await AppServices.masterclasses.getDetail(id);
+      if (!mounted) return;
+      setState(() {
+        _detail = detail;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    }
+  }
+
   Future<void> _toggleLike(VideoSummary video) async {
     final previousLiked = video.members.firstWhere((m) => m.isYou).liked;
     _updateSelfMember(video.id, (m) => m.copyWith(liked: !previousLiked));
@@ -318,27 +337,32 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBin
       backgroundColor: AppColors.pageBg,
       appBar: AppTopBar(
         title: title,
-        leadingIcon: Icons.menu,
-        onLeadingTap: () => Navigator.of(context).maybePop(),
         showAvatar: true,
+        onAvatarTap: () =>
+            Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       bottomNavigationBar: AppBottomNavBar(
-        activeTab: AppNavTab.classes,
+        activeTab: null,
+        onHomeTap: () => Navigator.of(context).pushReplacementNamed('/home'),
         onPartnerTap: () => Navigator.of(context).pushReplacementNamed('/partner-link'),
         onProfileTap: () => Navigator.of(context).pushReplacementNamed('/profile'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 768),
-          child: _loading
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 64),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _error != null
-              ? _ErrorState(message: _error!, onRetry: _load)
-              : _buildContent(),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 768),
+            child: _loading
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 64),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _error != null
+                ? _ErrorState(message: _error!, onRetry: _load)
+                : _buildContent(),
+          ),
         ),
       ),
     );

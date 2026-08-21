@@ -88,30 +88,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     _refresh();
   }
 
-  Future<void> _showAccountMenu(BuildContext context) async {
-    final signOut = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(AppServices.auth.currentSession?.email ?? 'Account'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sign Out'),
-          ),
-        ],
-      ),
-    );
-    if (signOut == true) {
-      await AppServices.auth.signOut();
-      if (!context.mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-    }
-  }
-
   /// Buckets masterclasses into mutually-exclusive Currently Watching /
   /// Partner Up / Available / Completed lists based on
   /// `yourProgress.percentComplete`. "Partner up" pulls out masterclasses
@@ -203,9 +179,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       backgroundColor: Colors.white,
       appBar: AppTopBar(
         title: 'Parenting Masterclass',
-        leadingIcon: Icons.menu,
         showAvatar: true,
-        onAvatarTap: () => _showAccountMenu(context),
+        onAvatarTap: () =>
+            Navigator.of(context).pushReplacementNamed('/profile'),
       ),
       bottomNavigationBar: AppBottomNavBar(
         activeTab: AppNavTab.home,
