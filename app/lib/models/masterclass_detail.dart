@@ -1,19 +1,22 @@
+import 'video_member_activity.dart';
+
 /// A single video within a masterclass. Mirrors the backend's
-/// `VideoWithActivity` schema (`backend/docs/openapi.yaml`), minus the
-/// `members` field — per-family like/watch-progress activity isn't wired up
-/// yet, so it's intentionally left unparsed here.
+/// `VideoWithActivity` schema (`backend/docs/openapi.yaml`), including
+/// per-family-member like/watch-progress activity (`members`).
 class VideoSummary {
   const VideoSummary({
     required this.id,
     required this.title,
     required this.durationSeconds,
     required this.videoUrl,
+    required this.members,
   });
 
   final String id;
   final String title;
   final int durationSeconds;
   final String videoUrl;
+  final List<VideoMemberActivity> members;
 
   factory VideoSummary.fromJson(Map<String, dynamic> json) {
     return VideoSummary(
@@ -21,6 +24,20 @@ class VideoSummary {
       title: json['title'] as String,
       durationSeconds: json['durationSeconds'] as int,
       videoUrl: json['videoUrl'] as String,
+      members: (json['members'] as List).map((e) => VideoMemberActivity.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  /// Returns a copy with [update] applied to the caller's own entry in
+  /// [members] (the one with `isYou == true`), leaving other members
+  /// untouched. Used to apply optimistic like/progress updates.
+  VideoSummary copyWithSelfMember(VideoMemberActivity Function(VideoMemberActivity self) update) {
+    return VideoSummary(
+      id: id,
+      title: title,
+      durationSeconds: durationSeconds,
+      videoUrl: videoUrl,
+      members: members.map((m) => m.isYou ? update(m) : m).toList(),
     );
   }
 }

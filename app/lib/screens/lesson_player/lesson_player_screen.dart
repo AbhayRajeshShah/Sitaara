@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -7,12 +9,17 @@ import '../../components/dual_progress_bar.dart';
 import '../../components/image_placeholder.dart';
 import '../../components/primary_button.dart';
 import '../../models/masterclass_detail.dart';
-import '../../models/parent_role.dart';
 import '../../models/video_member_activity.dart';
 import '../../services/api_client.dart';
 import '../../services/app_services.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_typography.dart';
+
+/// How often to save/report watch progress while a video is playing. See
+/// `_flushProgress` for the full set of triggers (this timer is only the
+/// steady-state one — completion, video switches, backgrounding, and
+/// disposal all flush immediately instead of waiting for this tick).
+const _progressTickInterval = Duration(seconds: 10);
 
 /// Nobody liked the video: returns null. Otherwise "Liked by You, Mom" /
 /// "Liked by You" / "Liked by Mom", LinkedIn-style.
@@ -39,45 +46,6 @@ bool _partnerCurrentlyWatching(List<VideoMemberActivity> members, int durationSe
   return partner.watchedSeconds > 0 && partner.watchedSeconds < durationSeconds;
 }
 
-/// Decorative mock like/watch-progress data, keyed by video position rather
-/// than a fixed title, since the real likes/watch-progress APIs don't exist
-/// on the backend yet (see plan). Cycles through a few states so the range
-/// of UI treatments is visible across a real video list of any length.
-List<VideoMemberActivity> _mockMembersFor(int index, int durationSeconds) {
-  switch (index % 4) {
-    case 0:
-      return [
-        VideoMemberActivity(
-          role: ParentRole.dad,
-          isYou: true,
-          liked: true,
-          watchedSeconds: (durationSeconds * 0.33).round(),
-        ),
-        VideoMemberActivity(
-          role: ParentRole.mom,
-          isYou: false,
-          liked: true,
-          watchedSeconds: (durationSeconds * 0.55).round(),
-        ),
-      ];
-    case 1:
-      return [
-        VideoMemberActivity(role: ParentRole.dad, isYou: true, liked: false, watchedSeconds: durationSeconds),
-        VideoMemberActivity(role: ParentRole.mom, isYou: false, liked: true, watchedSeconds: durationSeconds),
-      ];
-    case 2:
-      return [
-        VideoMemberActivity(role: ParentRole.dad, isYou: true, liked: true, watchedSeconds: durationSeconds),
-        VideoMemberActivity(role: ParentRole.mom, isYou: false, liked: false, watchedSeconds: 0),
-      ];
-    default:
-      return [
-        VideoMemberActivity(role: ParentRole.dad, isYou: true, liked: false, watchedSeconds: 0),
-        VideoMemberActivity(role: ParentRole.mom, isYou: false, liked: false, watchedSeconds: 0),
-      ];
-  }
-}
-
 String _formatDuration(Duration d) {
   final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -91,7 +59,7 @@ class LessonPlayerScreen extends StatefulWidget {
   State<LessonPlayerScreen> createState() => _LessonPlayerScreenState();
 }
 
-class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
+class _LessonPlayerScreenState extends State<LessonPlayerScreen> with WidgetsBindingObserver {
   bool _argsRead = false;
   String? _masterclassId;
   String? _titleFallback;
@@ -104,6 +72,15 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
   VideoPlayerController? _controller;
   String? _videoError;
 
+  Timer? _progressTimer;
+  bool _progressFlushedForCurrentVideo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -115,6 +92,13 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
       _titleFallback = args['title'] as String?;
     }
     _load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      unawaited(_flushProgress());
+    }
   }
 
   Future<void> _load() async {
@@ -151,6 +135,12 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
     final video = detail.videos[index];
 
     final oldController = _controller;
+    if (oldController != null && oldController.value.isInitialized) {
+      await _flushProgress();
+    }
+    _progressTimer?.cancel();
+    _progressTimer = null;
+
     setState(() {
       _selectedIndex = index;
       _controller = null;
@@ -161,12 +151,24 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
     final controller = VideoPlayerController.networkUrl(Uri.parse(video.videoUrl));
     try {
       await controller.initialize();
+
+      final durationSeconds = controller.value.duration.inSeconds;
+      final resumeSeconds = await _reconcileProgress(video, durationSeconds);
+      if (resumeSeconds > 0 && resumeSeconds < durationSeconds) {
+        await controller.seekTo(Duration(seconds: resumeSeconds));
+      }
+
       if (autoplay) await controller.play();
       if (!mounted) {
         await controller.dispose();
         return;
       }
       setState(() => _controller = controller);
+      _progressFlushedForCurrentVideo = false;
+      _progressTimer = Timer.periodic(_progressTickInterval, (_) {
+        if (_controller?.value.isPlaying ?? false) unawaited(_flushProgress());
+      });
+      controller.addListener(_onControllerTick);
     } catch (_) {
       await controller.dispose();
       if (!mounted) return;
@@ -174,8 +176,99 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
     }
   }
 
+  /// Detects playback reaching the end of the video and flushes immediately,
+  /// so the final position is the true end (not truncated to the last
+  /// periodic tick).
+  void _onControllerTick() {
+    if (_progressFlushedForCurrentVideo) return;
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    final position = controller.value.position;
+    final duration = controller.value.duration;
+    if (duration.inMilliseconds > 0 && position >= duration) {
+      _progressFlushedForCurrentVideo = true;
+      _progressTimer?.cancel();
+      unawaited(_flushProgress());
+    }
+  }
+
+  /// Compares the locally-cached watch position against the server's, pushes
+  /// the local value if it's ahead (covers a prior sync that never made it
+  /// to the backend before the app closed), and returns the position
+  /// playback should resume from.
+  Future<int> _reconcileProgress(VideoSummary video, int durationSeconds) async {
+    final serverSeconds = video.members.firstWhere((m) => m.isYou).watchedSeconds;
+    final localSeconds = await AppServices.watchProgress.read(video.id) ?? 0;
+
+    if (localSeconds > serverSeconds) {
+      try {
+        final stored = await AppServices.masterclasses.updateProgress(video.id, localSeconds);
+        _updateSelfMember(video.id, (m) => m.copyWith(watchedSeconds: stored));
+      } catch (_) {
+        // Still offline — the local cache already holds this value and will
+        // be retried the next time this video is opened or flushed.
+      }
+    }
+
+    var resumeSeconds = localSeconds > serverSeconds ? localSeconds : serverSeconds;
+    if (resumeSeconds < 0) resumeSeconds = 0;
+    if (durationSeconds > 0 && resumeSeconds > durationSeconds) resumeSeconds = durationSeconds;
+    return resumeSeconds;
+  }
+
+  /// Saves the current playback position locally, then best-effort syncs it
+  /// to the backend. Called on a steady 10s timer while playing, and
+  /// immediately on video completion, video switch, screen disposal, and app
+  /// backgrounding — see `_progressTickInterval`'s doc comment.
+  Future<void> _flushProgress() async {
+    final controller = _controller;
+    final detail = _detail;
+    if (controller == null || detail == null || !controller.value.isInitialized) return;
+    final video = detail.videos[_selectedIndex];
+
+    final seconds = controller.value.position.inSeconds;
+    if (seconds <= 0) return;
+
+    await AppServices.watchProgress.write(video.id, seconds);
+
+    try {
+      final stored = await AppServices.masterclasses.updateProgress(video.id, seconds);
+      _updateSelfMember(video.id, (m) => m.copyWith(watchedSeconds: stored));
+    } catch (_) {
+      // Offline or the request failed — the local cache already holds this
+      // value, so nothing is lost, just delayed until the next flush.
+    }
+  }
+
+  Future<void> _toggleLike(VideoSummary video) async {
+    final previousLiked = video.members.firstWhere((m) => m.isYou).liked;
+    _updateSelfMember(video.id, (m) => m.copyWith(liked: !previousLiked));
+
+    try {
+      final liked = await AppServices.masterclasses.toggleLike(video.id);
+      _updateSelfMember(video.id, (m) => m.copyWith(liked: liked));
+    } catch (_) {
+      _updateSelfMember(video.id, (m) => m.copyWith(liked: previousLiked));
+    }
+  }
+
+  void _updateSelfMember(String videoId, VideoMemberActivity Function(VideoMemberActivity self) update) {
+    final detail = _detail;
+    if (!mounted || detail == null) return;
+    final index = detail.videos.indexWhere((v) => v.id == videoId);
+    if (index == -1) return;
+    setState(() {
+      final videos = [...detail.videos];
+      videos[index] = videos[index].copyWithSelfMember(update);
+      _detail = MasterclassDetail(id: detail.id, title: detail.title, description: detail.description, videos: videos);
+    });
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _progressTimer?.cancel();
+    unawaited(_flushProgress());
     _controller?.dispose();
     super.dispose();
   }
@@ -220,7 +313,8 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
     }
 
     final current = detail.videos[_selectedIndex];
-    final likedByLabel = _likedByLabel(_mockMembersFor(_selectedIndex, current.durationSeconds));
+    final liked = current.members.firstWhere((m) => m.isYou).liked;
+    final likedByLabel = _likedByLabel(current.members);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,8 +330,11 @@ class _LessonPlayerScreenState extends State<LessonPlayerScreen> {
           children: [
             Expanded(child: Text(current.title, style: AppTypography.heading3)),
             IconButton(
-              icon: const Icon(Icons.favorite, color: AppColors.deepPurple),
-              onPressed: () {},
+              icon: Icon(
+                liked ? Icons.favorite : Icons.favorite_border,
+                color: liked ? AppColors.deepPurple : AppColors.bodyText,
+              ),
+              onPressed: () => _toggleLike(current),
             ),
           ],
         ),
@@ -451,7 +548,7 @@ class _CourseItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final members = _mockMembersFor(index, video.durationSeconds);
+    final members = video.members;
     final likedByLabel = _likedByLabel(members);
     final partnerWatching = _partnerCurrentlyWatching(members, video.durationSeconds);
     final partner = _partner(members);

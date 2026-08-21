@@ -18,4 +18,21 @@ class MasterclassService {
     final data = await _api.get('/masterclasses/$id') as Map<String, dynamic>;
     return MasterclassDetail.fromJson(data);
   }
+
+  /// Toggles the caller's like state for a video: likes it if not already
+  /// liked, unlikes it otherwise. Returns the resulting `liked` state.
+  Future<bool> toggleLike(String videoId) async {
+    final data = await _api.post('/videos/$videoId/like') as Map<String, dynamic>;
+    return data['liked'] as bool;
+  }
+
+  /// Reports the caller's current playback position for a video. The
+  /// backend keeps whichever is furthest, so this is safe to call
+  /// repeatedly with any position. Returns the stored (furthest-watched)
+  /// position, which may be greater than [watchedSeconds].
+  Future<int> updateProgress(String videoId, int watchedSeconds) async {
+    final data =
+        await _api.post('/videos/$videoId/progress', body: {'watchedSeconds': watchedSeconds}) as Map<String, dynamic>;
+    return data['watchedSeconds'] as int;
+  }
 }
